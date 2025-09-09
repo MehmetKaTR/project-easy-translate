@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.util.List;
+
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Builder
@@ -23,13 +25,14 @@ public class Word extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "wordlist_id", nullable = false)
-    private WordList wordList;
-
     @NotNull
     @Size(min = 1, max = 50)
     private String word;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "wordlist_id")
+    private WordList wordList;
+
 
     @NotNull
     private String languageCode;

@@ -1,0 +1,31 @@
+package com.mehmetkatr.project_easy_translate.service;
+
+import com.mehmetkatr.project_easy_translate.entity.TokenUsageLog;
+import com.mehmetkatr.project_easy_translate.entity.User;
+import com.mehmetkatr.project_easy_translate.repository.TokenUsageLogRepository;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class TokenUsageLogService {
+
+    private final TokenUsageLogRepository tokenUsageLogRepository;
+
+    public List<TokenUsageLog> findByUser(User user) {
+        return tokenUsageLogRepository.findByUser(user);
+    }
+
+    public TokenUsageLog findByStoryId(String storyId) {
+        return tokenUsageLogRepository.findByStoryId(storyId);
+    }
+
+    public int getTokensUsedByUser(User user) {
+
+    }
+
+}

@@ -10,8 +10,6 @@ public interface TokenUsageLogRepository extends JpaRepository<TokenUsageLog, Lo
 
     List<TokenUsageLog> findByUser(User user);
 
-    List<TokenUsageLog> findByUserAndStoryId(User user, String storyId);
-
-    List<TokenUsageLog> findByStoryId(String storyId);
+    TokenUsageLog findByStoryId(String storyId);
 
 }

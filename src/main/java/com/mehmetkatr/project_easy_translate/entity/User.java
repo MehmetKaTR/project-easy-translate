@@ -43,7 +43,7 @@ public class User extends BaseEntity {
     private String passwordHash;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
+    @Enumerated(EnumType.ORDINAL)
     @Column(name = "role", nullable = false)
     private Role role;
 

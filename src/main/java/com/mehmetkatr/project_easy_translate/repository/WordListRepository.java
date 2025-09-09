@@ -14,6 +14,8 @@ public interface WordListRepository extends JpaRepository<WordList, Long> {
 
     Optional<WordList> findByUser(User user);
 
+    Optional<WordList> findByUserAndName(User user, String name);
+
     List<WordList> findByUserAndNameContainingIgnoreCase(User user, String name);
 
 }
