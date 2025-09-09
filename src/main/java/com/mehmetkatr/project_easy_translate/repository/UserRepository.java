@@ -1,0 +1,19 @@
+package com.mehmetkatr.project_easy_translate.repository;
+
+import com.mehmetkatr.project_easy_translate.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    Optional<User> findByUsername(String username);
+
+    Optional<User> findByEmail(String email);
+
+    List<User> findByRole(User.Role role);
+
+    List<User> findBySubscriptionLevel(User.SubscriptionLevel subscriptionLevel);
+
+}
