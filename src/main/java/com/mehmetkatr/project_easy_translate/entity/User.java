@@ -43,11 +43,6 @@ public class User extends BaseEntity {
     private String passwordHash;
 
     @NotNull
-    @Enumerated(EnumType.ORDINAL)
-    @Column(name = "role", nullable = false)
-    private Role role;
-
-    @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "subscription_level", nullable = false)
     private SubscriptionLevel subscriptionLevel;
@@ -63,20 +58,12 @@ public class User extends BaseEntity {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TokenUsageLog> tokenUsageLogs;
 
-    //cascade = Parent uzerinde yapilan islemleri (save, delete, update) child’a da uygular
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ImportExportLog> importExportLogs;
-
-    @OneToMany(mappedBy = "admin", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<AdminActionLog> adminActions;
-
     @OneToMany(mappedBy = "targetUser", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AdminActionLog> targetUserActions;
 
-    public enum Role {
-        USER,
-        ADMIN
-    }
+    //cascade = Parent uzerinde yapilan islemleri (save, delete, update) child’a da uygular
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ImportExportLog> importExportLogs;
 
     public enum SubscriptionLevel {
         FREE,

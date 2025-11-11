@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 
 @Data
 @Builder
@@ -31,8 +31,8 @@ public class Story {
     private String language;
 
     @Field("created_at")
-    private LocalDateTime createdAt;
+    private Date createdAt;
 
     @Field("updated_at")
-    private LocalDateTime updatedAt;
+    private Date updatedAt;
 }

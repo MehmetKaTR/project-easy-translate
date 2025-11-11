@@ -1,0 +1,30 @@
+package com.mehmetkatr.project_easy_translate.service;
+
+import com.mehmetkatr.project_easy_translate.entity.ImportExportLog;
+import com.mehmetkatr.project_easy_translate.entity.LlmModel;
+import com.mehmetkatr.project_easy_translate.repository.LlmModelRepository;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class LlmModelService {
+
+    private final LlmModelRepository llmModelRepository;
+
+    public List<LlmModel> findByName(String name) {
+        return llmModelRepository.findByName(name);
+    }
+
+    public List<LlmModel> findByStatus(LlmModel.Status status) {
+        return llmModelRepository.findByStatus(status);
+    }
+
+    public void save(LlmModel llmModel) {
+        llmModelRepository.save(llmModel);
+    }
+}

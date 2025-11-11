@@ -32,8 +32,7 @@ public class Word extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "wordlist_id")
     private WordList wordList;
-
-
+    
     @NotNull
     private String languageCode;
 

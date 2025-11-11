@@ -12,7 +12,7 @@ public interface WordListRepository extends JpaRepository<WordList, Long> {
 
     Optional<WordList> findByName(String name);
 
-    Optional<WordList> findByUser(User user);
+    List<WordList> findByUser(User user);
 
     Optional<WordList> findByUserAndName(User user, String name);
 

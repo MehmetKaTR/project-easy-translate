@@ -34,7 +34,6 @@ public class WordList extends BaseEntity {
     private String name;
 
     @OneToMany(mappedBy = "wordList", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "wordlist_id")
     private List<Word> words;
 
 }
