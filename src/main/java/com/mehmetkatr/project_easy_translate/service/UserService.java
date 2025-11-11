@@ -22,16 +22,16 @@ public class UserService {
         return userRepository.findAll();
     }
 
-    public List<User> findByRole(User.Role role) {
-        return userRepository.findByRole(role);
-    }
-
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }
 
     public Optional<User> findByUsername(String username) {
         return userRepository.findByUsername(username);
+    }
+
+    public List<User> findBySubscriptionLevel(User.SubscriptionLevel subscriptionLevel) {
+        return userRepository.findBySubscriptionLevel(subscriptionLevel);
     }
 
     @Transactional
@@ -47,20 +47,19 @@ public class UserService {
                 .username(username)
                 .email(email)
                 .passwordHash(passwordEncoder.encode(rawPassword))
-                .role(User.Role.USER)
                 .subscriptionLevel(User.SubscriptionLevel.FREE)
                 .tokenBalance(0)
                 .build();
 
         User savedUser = userRepository.save(user);
 
-        String jwt = tokenService.generateToken(savedUser.getUsername(), savedUser.getRole().name());
+        // JWT artık sadece username veya subscriptionLevel içerebilir
+        String jwt = tokenService.generateToken(savedUser.getUsername(), savedUser.getSubscriptionLevel().name());
         System.out.println("Generated JWT for new user: " + jwt);
 
         return savedUser;
     }
 
-    // OAuth / Google login gibi social registration
     @Transactional
     public User registerOrLoginSocial(String email, String username) {
         Optional<User> existingUser = userRepository.findByEmail(email);
@@ -68,22 +67,19 @@ public class UserService {
             return existingUser.get();
         }
 
-
         User user = User.builder()
                 .username(username)
                 .email(email)
-                .passwordHash("") // social login : no need to password
-                .role(User.Role.USER)
+                .passwordHash("") // social login: şifre gerekmez
                 .subscriptionLevel(User.SubscriptionLevel.FREE)
                 .tokenBalance(0)
                 .build();
 
         User savedUser = userRepository.save(user);
 
-        String jwt = tokenService.generateToken(savedUser.getUsername(), savedUser.getRole().name());
+        String jwt = tokenService.generateToken(savedUser.getUsername(), savedUser.getSubscriptionLevel().name());
         System.out.println("Generated JWT for social user: " + jwt);
 
         return savedUser;
     }
-
 }

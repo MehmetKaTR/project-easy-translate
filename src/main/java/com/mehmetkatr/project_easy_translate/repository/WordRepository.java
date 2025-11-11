@@ -20,4 +20,6 @@ public interface WordRepository extends JpaRepository<Word, Long> {
 
     List<Word> findByWordListAndLanguageCode(WordList wordList, String languageCode);
 
+    List<Word> findByWordListAndTranslated(WordList wordList, String translated);
+
 }

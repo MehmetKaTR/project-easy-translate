@@ -12,4 +12,5 @@ public interface ImportExportLogRepository extends JpaRepository<ImportExportLog
 
     List<ImportExportLog> findBySource(String source);
 
+    List<ImportExportLog> findByUserAndSource(User user, String source);
 }

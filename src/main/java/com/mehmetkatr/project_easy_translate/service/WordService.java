@@ -34,4 +34,8 @@ public class WordService {
         return wordRepository.findByTranslated(translated);
     }
 
+    public List<Word> getByWordListAndTranslated(WordList wordList, String translated) {
+        return wordRepository.findByWordListAndTranslated(wordList, translated);
+    }
+
 }

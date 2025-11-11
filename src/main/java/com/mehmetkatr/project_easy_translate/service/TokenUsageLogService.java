@@ -24,8 +24,13 @@ public class TokenUsageLogService {
         return tokenUsageLogRepository.findByStoryId(storyId);
     }
 
-    public int getTokensUsedByUser(User user) {
+    public void save(TokenUsageLog tokenUsageLog) {
+        tokenUsageLogRepository.save(tokenUsageLog);
+    }
 
+    public int findTokenUsageByStoryId(String storyId) {
+        TokenUsageLog tokenUsageLog = tokenUsageLogRepository.findByStoryId(storyId);
+        return tokenUsageLog.getTokensUsed();
     }
 
 }

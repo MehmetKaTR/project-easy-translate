@@ -10,8 +10,8 @@ import java.util.Optional;
 
 public interface LlmModelRepository extends MongoRepository<LlmModel, String> {
 
-    Optional<LlmModel> findByName(String name);
+    List<LlmModel> findByName(String name);
 
-    List<Model> findByStatus(LlmModel.Status status);
+    List<LlmModel> findByStatus(LlmModel.Status status);
 
 }
