@@ -1,7 +1,9 @@
 package com.mehmetkatr.project_easy_translate.service;
 
 import com.mehmetkatr.project_easy_translate.entity.User;
+import com.mehmetkatr.project_easy_translate.entity.WordList;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
+import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final TokenService tokenService;
+    private final WordListRepository wordListRepository;
     private final PasswordEncoder passwordEncoder;
 
     public List<User> findAll() {
@@ -53,6 +56,13 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
 
+        WordList generalList = WordList.builder()
+                .name("General")
+                .user(savedUser)
+                .hexColorCode("#EEEEEE")
+                .build();
+        wordListRepository.save(generalList);
+
         // JWT artık sadece username veya subscriptionLevel içerebilir
         String jwt = tokenService.generateToken(savedUser.getUsername(), savedUser.getSubscriptionLevel().name());
         System.out.println("Generated JWT for new user: " + jwt);
@@ -76,6 +86,13 @@ public class UserService {
                 .build();
 
         User savedUser = userRepository.save(user);
+
+        WordList generalList = WordList.builder()
+                .name("General")
+                .user(savedUser)
+                .hexColorCode("#EEEEEE")
+                .build();
+        wordListRepository.save(generalList);
 
         String jwt = tokenService.generateToken(savedUser.getUsername(), savedUser.getSubscriptionLevel().name());
         System.out.println("Generated JWT for social user: " + jwt);

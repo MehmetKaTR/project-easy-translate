@@ -33,6 +33,11 @@ public class WordList extends BaseEntity {
     @Size(min = 1, max = 50)
     private String name;
 
+    @NotNull
+    @Size(min = 1, max = 7)
+    @Column(name = "hex_color_code", length = 7, nullable = false)
+    private String hexColorCode;
+
     @OneToMany(mappedBy = "wordList", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Word> words;
 

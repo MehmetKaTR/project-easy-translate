@@ -3,6 +3,7 @@ package com.mehmetkatr.project_easy_translate.repository;
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.mongodb.core.mapping.Language;
 
 import java.util.List;
@@ -21,5 +22,8 @@ public interface WordRepository extends JpaRepository<Word, Long> {
     List<Word> findByWordListAndLanguageCode(WordList wordList, String languageCode);
 
     List<Word> findByWordListAndTranslated(WordList wordList, String translated);
+
+    @Query("SELECT w FROM Word w WHERE w.wordList.user.id = :userId ORDER BY w.id ASC")
+    List<Word> findAllByUserId(Long userId);
 
 }

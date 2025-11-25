@@ -22,6 +22,10 @@ public class WordService {
         return wordRepository.findByWordList(wordList);
     }
 
+    public List<Word> getAllWordsByUser(Long userId) {
+        return wordRepository.findAllByUserId(userId);
+    }
+
     public List<Word> getWordsByLanguageCode(String languageCode) {
         return wordRepository.findByLanguageCode(languageCode);
     }
@@ -36,6 +40,18 @@ public class WordService {
 
     public List<Word> getByWordListAndTranslated(WordList wordList, String translated) {
         return wordRepository.findByWordListAndTranslated(wordList, translated);
+    }
+
+    public Word addWord(Word word) {
+        return wordRepository.save(word);
+    }
+
+    public void deleteWord(Word word) {
+        wordRepository.delete(word);
+    }
+
+    public void deleteWordById(Long wordId) {
+        wordRepository.deleteById(wordId);
     }
 
 }

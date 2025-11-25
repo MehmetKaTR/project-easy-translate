@@ -1,5 +1,6 @@
 package com.mehmetkatr.project_easy_translate.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -31,6 +32,7 @@ public class Word extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "wordlist_id")
+    @JsonIgnore
     private WordList wordList;
     
     @NotNull
