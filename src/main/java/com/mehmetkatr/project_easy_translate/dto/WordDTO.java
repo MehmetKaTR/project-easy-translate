@@ -11,6 +11,8 @@ public class WordDTO {
     private String languageCode;
     private Long wordListId;
 
+    public WordDTO(){}
+
     public WordDTO(Word word) {
         this.id = word.getId();
         this.word = word.getWord();

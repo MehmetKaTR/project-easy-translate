@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -32,8 +33,16 @@ public class WordListService {
         return wordListRepository.findByUserAndNameContainingIgnoreCase(user, "");
     }
 
-    public List<WordList> getWordListsByUserAndName(User user, String name) {
-        return wordListRepository.findByUserAndNameContainingIgnoreCase(user, name);
+    public List<WordList> getWordListsByUser(Long userId) {
+        return wordListRepository.findAllByUserIdWithWords(userId);
+    }
+
+    public Optional<WordList> getWordListsByUserAndName(User user, String name) {
+        return wordListRepository.findByUserAndName(user, name);
+    }
+
+    public Optional<WordList> getWordListsByUserAndWordListId(User user, Long wordlistId) {
+        return wordListRepository.findByUserAndId(user, wordlistId);
     }
 
     public WordList createWordList(WordList wordList) {
@@ -82,6 +91,11 @@ public class WordListService {
 
         return wordListRepository.save(wordList);
     }
+
+    public WordList saveWordList(WordList wordList) {
+        return wordListRepository.save(wordList);
+    }
+
 
     public void addWordsToWordList(Long wordListId, List<Long> wordIds) {
         WordList wordList = getWordListById(wordListId);
