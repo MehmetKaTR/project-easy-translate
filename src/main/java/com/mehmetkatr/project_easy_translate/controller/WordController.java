@@ -45,6 +45,29 @@ public class WordController {
         return ResponseEntity.ok(dtoList);
     }
 
+    @GetMapping("/all_words")
+    @Transactional
+    public ResponseEntity<List<WordDTO>> getAllWordsByAll(@RequestParam Long userId) {
+
+        User user = new User();
+        user.setId(userId);
+
+        Optional<WordList> wordListOpt = wordListService.getWordListsByUserAndName(user, "All");
+
+        if (wordListOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        WordList wordList = wordListOpt.get();
+
+        // WordList içindeki kelimeleri DTO'ya çevir
+        List<WordDTO> dtoList = wordList.getWords().stream()
+                .map(WordDTO::new)
+                .toList();
+
+        return ResponseEntity.ok(dtoList);
+    }
+
     @GetMapping("/byWordList")
     @Transactional
     public ResponseEntity<List<WordDTO>> getAllWordsByWordList(@RequestParam Long userId, @RequestParam Long wordListId) {
@@ -88,6 +111,37 @@ public class WordController {
         Word saved = wordService.addWord(word);
         return ResponseEntity.ok(new WordDTO(saved));
     }
+
+    @PutMapping("/addToWordList")
+    public ResponseEntity<WordDTO> addWordToWordList(
+            @RequestParam Long userId,
+            @RequestParam long wordListId,
+            @RequestBody WordDTO wordDTO
+    ) {
+        User user = new User();
+        user.setId(userId);
+
+        Optional<WordList> targetListOpt =
+                wordListService.getWordListsByUserAndWordListId(user, wordListId);
+
+        if (targetListOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        WordList targetList = targetListOpt.get();
+
+        Word newWord = Word.builder()
+                .word(wordDTO.getWord())
+                .translated(wordDTO.getTranslated())
+                .languageCode(wordDTO.getLanguageCode())
+                .wordList(targetList)
+                .build();
+
+        Word saved = wordService.addWord(newWord);
+
+        return ResponseEntity.ok(new WordDTO(saved));
+    }
+
 
     @DeleteMapping("/delete")
     public ResponseEntity<WordDTO> deleteWord(@RequestParam Long userId, @RequestParam Long wordId) {
