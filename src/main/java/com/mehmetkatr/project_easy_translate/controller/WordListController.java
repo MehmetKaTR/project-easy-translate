@@ -57,22 +57,34 @@ public class WordListController {
 
     @PutMapping("/update")
     @Transactional
-    public ResponseEntity<WordListDTO>  updateWordList(@RequestParam Long userId, @RequestParam Long wordListId, @RequestBody WordListDTO dto) {
+    public ResponseEntity<WordListDTO> updateWordList(
+            @RequestParam Long userId,
+            @RequestParam Long wordListId,
+            @RequestBody WordListDTO dto) {
+
         User user = new User();
         user.setId(userId);
 
         WordList wordList = new WordList();
-
         wordList.setId(wordListId);
         wordList.setUser(user);
         wordList.setName(dto.getName());
         wordList.setHexColorCode(dto.getColor());
-        wordList.setWords(dto.getWords());
+
+        List<Word> updatedWords = new ArrayList<>();
+
+        for (Word w : dto.getWords()) {
+            w.setWordList(wordList);
+            updatedWords.add(w);
+        }
+
+        wordList.setWords(updatedWords);
 
         WordList saved = wordListService.saveWordList(wordList);
 
         return ResponseEntity.ok(new WordListDTO(saved));
     }
+
 
     @DeleteMapping("/delete")
     public ResponseEntity<WordListDTO> deleteWordList(
