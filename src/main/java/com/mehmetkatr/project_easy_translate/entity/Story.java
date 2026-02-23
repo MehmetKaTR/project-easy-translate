@@ -1,6 +1,6 @@
 package com.mehmetkatr.project_easy_translate.entity;
 
-import jakarta.persistence.Id;
+import org.springframework.data.annotation.Id;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,12 +23,18 @@ public class Story {
     @Field("user_id")
     private Long userId;
 
+    @Field("story_name")
+    private String storyName;
+
     @Field("prompt_words")
     private String promptWords;
 
     private String content;
 
     private String language;
+
+    @Builder.Default
+    private boolean starred = false;
 
     @Field("created_at")
     private Date createdAt;
