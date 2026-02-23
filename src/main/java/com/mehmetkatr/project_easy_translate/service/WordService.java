@@ -4,6 +4,7 @@ import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordRepository;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,10 @@ public class WordService {
         return wordRepository.findAllByUserId(userId);
     }
 
+    public List<Word> getStarredWordsByUser(Long userId) {
+        return wordRepository.findStarredByUserId(userId);
+    }
+
     public List<Word> getWordsByLanguageCode(String languageCode) {
         return wordRepository.findByLanguageCode(languageCode);
     }
@@ -42,7 +47,18 @@ public class WordService {
         return wordRepository.findByWordListAndTranslated(wordList, translated);
     }
 
+    public List<Word> getByWordListAndStarred(WordList wordList, boolean starred) {
+        return wordRepository.findByWordListAndStarred(wordList, starred);
+    }
+
     public Word addWord(Word word) {
+        return wordRepository.save(word);
+    }
+
+    public Word updateStarred(Long wordId, boolean starred) {
+        Word word = wordRepository.findById(wordId)
+                .orElseThrow(() -> new EntityNotFoundException("Word not found: " + wordId));
+        word.setStarred(starred);
         return wordRepository.save(word);
     }
 
@@ -53,5 +69,4 @@ public class WordService {
     public void deleteWordById(Long wordId) {
         wordRepository.deleteById(wordId);
     }
-
 }

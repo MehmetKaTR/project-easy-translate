@@ -6,8 +6,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
-import java.util.List;
-
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Builder
@@ -17,7 +15,8 @@ import java.util.List;
 @Table(
         name = "words",
         indexes = {
-                @Index(name = "idx_words_wordlist_id", columnList = "wordlist_id")
+                @Index(name = "idx_words_wordlist_id", columnList = "wordlist_id"),
+                @Index(name = "idx_words_starred", columnList = "starred")
         }
 )
 public class Word extends BaseEntity {
@@ -34,11 +33,15 @@ public class Word extends BaseEntity {
     @JoinColumn(name = "wordlist_id")
     @JsonIgnore
     private WordList wordList;
-    
+
     @NotNull
     private String languageCode;
 
     @NotNull
     @Size(min = 1, max = 50)
     private String translated;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean starred = false;
 }

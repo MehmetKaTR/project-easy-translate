@@ -5,10 +5,13 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
-public interface StoryRepository extends MongoRepository<Story, Long> {
+public interface StoryRepository extends MongoRepository<Story, String> {
 
     List<Story> findByUserId(Long userId);
+
+    List<Story> findByUserIdAndStarred(Long userId, boolean starred);
 
     List<Story> findByPromptWords(String promptWords);
 
@@ -18,4 +21,5 @@ public interface StoryRepository extends MongoRepository<Story, Long> {
 
     List<Story> findByCreatedAtBetween(Date startDate, Date endDate);
 
+    Optional<Story> findByIdAndUserId(String id, Long userId);
 }
