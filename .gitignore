@@ -34,3 +34,5 @@ src/main/resources/application-dev.properties
 ### VS Code ###
 .vscode/
 .env
+.DS_Store
+**/.DS_Store
