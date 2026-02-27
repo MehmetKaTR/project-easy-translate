@@ -1,5 +1,6 @@
 package com.mehmetkatr.project_easy_translate.service;
 
+import com.mehmetkatr.project_easy_translate.dto.auth.AuthResponse;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
@@ -20,6 +21,7 @@ public class UserService {
     private final TokenService tokenService;
     private final WordListRepository wordListRepository;
     private final PasswordEncoder passwordEncoder;
+    private final GoogleTokenVerifierService googleTokenVerifierService;
 
     public List<User> findAll() {
         return userRepository.findAll();
@@ -57,16 +59,13 @@ public class UserService {
         User savedUser = userRepository.save(user);
 
         WordList generalList = WordList.builder()
-                .name("General")
+                .name("All")
                 .user(savedUser)
                 .hexColorCode("#EEEEEE")
                 .build();
         wordListRepository.save(generalList);
 
         // JWT artık sadece username veya subscriptionLevel içerebilir
-        String jwt = tokenService.generateToken(savedUser.getUsername(), savedUser.getSubscriptionLevel().name());
-        System.out.println("Generated JWT for new user: " + jwt);
-
         return savedUser;
     }
 
@@ -88,15 +87,53 @@ public class UserService {
         User savedUser = userRepository.save(user);
 
         WordList generalList = WordList.builder()
-                .name("General")
+                .name("All")
                 .user(savedUser)
                 .hexColorCode("#EEEEEE")
                 .build();
         wordListRepository.save(generalList);
 
-        String jwt = tokenService.generateToken(savedUser.getUsername(), savedUser.getSubscriptionLevel().name());
-        System.out.println("Generated JWT for social user: " + jwt);
-
         return savedUser;
+    }
+
+    @Transactional
+    public AuthResponse register(String username, String email, String rawPassword) {
+        User savedUser = registerUser(username, email, rawPassword);
+        String token = tokenService.generateToken(savedUser.getUsername(), "ROLE_USER");
+        return buildAuthResponse(savedUser, token);
+    }
+
+    public AuthResponse login(String username, String rawPassword) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid username or password"));
+
+        if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Invalid username or password");
+        }
+
+        String token = tokenService.generateToken(user.getUsername(), "ROLE_USER");
+        return buildAuthResponse(user, token);
+    }
+
+    @Transactional
+    public AuthResponse socialLogin(String email, String username) {
+        User user = registerOrLoginSocial(email, username);
+        String token = tokenService.generateToken(user.getUsername(), "ROLE_USER");
+        return buildAuthResponse(user, token);
+    }
+
+    @Transactional
+    public AuthResponse loginWithGoogleIdToken(String idToken) {
+        GoogleTokenVerifierService.VerifiedGoogleUser googleUser = googleTokenVerifierService.verifyIdToken(idToken);
+        return socialLogin(googleUser.email(), googleUser.username());
+    }
+
+    private AuthResponse buildAuthResponse(User user, String token) {
+        return AuthResponse.builder()
+                .userId(user.getId())
+                .username(user.getUsername())
+                .token(token)
+                .tokenType("Bearer")
+                .build();
     }
 }

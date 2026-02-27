@@ -7,6 +7,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -31,6 +32,11 @@ public class TokenUsageLogService {
     public int findTokenUsageByStoryId(String storyId) {
         TokenUsageLog tokenUsageLog = tokenUsageLogRepository.findByStoryId(storyId);
         return tokenUsageLog.getTokensUsed();
+    }
+
+    public int sumTokensByUserBetween(User user, LocalDateTime start, LocalDateTime end) {
+        Long total = tokenUsageLogRepository.sumTokensByUserBetween(user, start, end);
+        return total == null ? 0 : total.intValue();
     }
 
 }

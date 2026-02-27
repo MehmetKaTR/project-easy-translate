@@ -32,6 +32,7 @@ public class StoryService {
                 .storyName(finalStoryName)
                 .promptWords(dto.getPromptWords())
                 .content(dto.getContent())
+                .turkishTranslation(dto.getTurkishTranslation())
                 .language(dto.getLanguage() == null ? "English" : dto.getLanguage())
                 .starred(Boolean.TRUE.equals(dto.getStarred())) // default false
                 .createdAt(now)
@@ -113,6 +114,9 @@ public class StoryService {
                     }
                     if (dto.getContent() != null) {
                         story.setContent(dto.getContent());
+                    }
+                    if (dto.getTurkishTranslation() != null) {
+                        story.setTurkishTranslation(dto.getTurkishTranslation());
                     }
                     if (dto.getLanguage() != null && !dto.getLanguage().isBlank()) {
                         story.setLanguage(dto.getLanguage());

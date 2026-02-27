@@ -1,8 +1,7 @@
 package com.mehmetkatr.project_easy_translate.controller;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.mehmetkatr.project_easy_translate.dto.WordDTO;
 import com.mehmetkatr.project_easy_translate.dto.WordListDTO;
+import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.entity.User;
 
 import com.mehmetkatr.project_easy_translate.entity.Word;
@@ -21,15 +20,16 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/word_lists")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class WordListController {
 
     private final WordListService wordListService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping("/all")
-    public ResponseEntity<List<WordListDTO>> getAllWordListsByUser(@RequestParam Long userId) {
+    public ResponseEntity<List<WordListDTO>> getAllWordListsByUser(@RequestParam(required = false) Long userId) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
 
-        List<WordList> wordLists = wordListService.getWordListsByUser(userId);
+        List<WordList> wordLists = wordListService.getWordListsByUser(authenticatedUserId);
 
         List<WordListDTO> dtoList = wordLists.stream()
                 .map(WordListDTO::new)
@@ -39,10 +39,11 @@ public class WordListController {
     }
 
     @PostMapping("/add")
-    public ResponseEntity<WordListDTO> addWordList(@RequestParam Long userId, @RequestBody WordListDTO dto) {
+    public ResponseEntity<WordListDTO> addWordList(@RequestParam(required = false) Long userId, @RequestBody WordListDTO dto) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
 
         User user = new User();
-        user.setId(userId);
+        user.setId(authenticatedUserId);
 
         WordList newList = new WordList();
         newList.setUser(user);
@@ -58,12 +59,13 @@ public class WordListController {
     @PutMapping("/update")
     @Transactional
     public ResponseEntity<WordListDTO> updateWordList(
-            @RequestParam Long userId,
+            @RequestParam(required = false) Long userId,
             @RequestParam Long wordListId,
             @RequestBody WordListDTO dto) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
 
         User user = new User();
-        user.setId(userId);
+        user.setId(authenticatedUserId);
 
         WordList wordList = new WordList();
         wordList.setId(wordListId);
@@ -88,12 +90,13 @@ public class WordListController {
 
     @DeleteMapping("/delete")
     public ResponseEntity<WordListDTO> deleteWordList(
-            @RequestParam Long userId,
+            @RequestParam(required = false) Long userId,
             @RequestParam Long wordListId) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
 
         // Kullanıcıyı oluştur / doğrula
         User user = new User();
-        user.setId(userId);
+        user.setId(authenticatedUserId);
 
         // Kullanıcının WordList'ini al
         Optional<WordList> wordListOpt = wordListService.getWordListsByUserAndWordListId(user, wordListId);

@@ -1,6 +1,7 @@
 package com.mehmetkatr.project_easy_translate.controller;
 
 import com.mehmetkatr.project_easy_translate.dto.WordDTO;
+import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
@@ -17,23 +18,25 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/words")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class WordController {
 
     private final WordService wordService;
     private final WordListService wordListService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping("/all")
-    public ResponseEntity<List<WordDTO>> getAllWordsByUser(@RequestParam Long userId) {
-        List<WordDTO> dtoList = wordService.getAllWordsByUser(userId).stream().map(WordDTO::new).toList();
+    public ResponseEntity<List<WordDTO>> getAllWordsByUser(@RequestParam(required = false) Long userId) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
+        List<WordDTO> dtoList = wordService.getAllWordsByUser(authenticatedUserId).stream().map(WordDTO::new).toList();
         return ResponseEntity.ok(dtoList);
     }
 
     @GetMapping("/all_words")
     @Transactional
-    public ResponseEntity<List<WordDTO>> getAllWordsByAll(@RequestParam Long userId) {
+    public ResponseEntity<List<WordDTO>> getAllWordsByAll(@RequestParam(required = false) Long userId) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         User user = new User();
-        user.setId(userId);
+        user.setId(authenticatedUserId);
 
         Optional<WordList> wordListOpt = wordListService.getWordListsByUserAndName(user, "All");
         if (wordListOpt.isEmpty()) return ResponseEntity.notFound().build();
@@ -44,9 +47,10 @@ public class WordController {
 
     @GetMapping("/byWordList")
     @Transactional
-    public ResponseEntity<List<WordDTO>> getAllWordsByWordList(@RequestParam Long userId, @RequestParam Long wordListId) {
+    public ResponseEntity<List<WordDTO>> getAllWordsByWordList(@RequestParam(required = false) Long userId, @RequestParam Long wordListId) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         User user = new User();
-        user.setId(userId);
+        user.setId(authenticatedUserId);
 
         Optional<WordList> wordListOpt = wordListService.getWordListsByUserAndWordListId(user, wordListId);
         if (wordListOpt.isEmpty()) return ResponseEntity.notFound().build();
@@ -56,15 +60,17 @@ public class WordController {
     }
 
     @GetMapping("/starred")
-    public ResponseEntity<List<WordDTO>> getStarredWords(@RequestParam Long userId) {
-        List<WordDTO> dtoList = wordService.getStarredWordsByUser(userId).stream().map(WordDTO::new).toList();
+    public ResponseEntity<List<WordDTO>> getStarredWords(@RequestParam(required = false) Long userId) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
+        List<WordDTO> dtoList = wordService.getStarredWordsByUser(authenticatedUserId).stream().map(WordDTO::new).toList();
         return ResponseEntity.ok(dtoList);
     }
 
     @PutMapping("/add")
-    public ResponseEntity<WordDTO> addWord(@RequestParam Long userId, @RequestBody WordDTO wordDTO) {
+    public ResponseEntity<WordDTO> addWord(@RequestParam(required = false) Long userId, @RequestBody WordDTO wordDTO) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         User user = new User();
-        user.setId(userId);
+        user.setId(authenticatedUserId);
 
         Optional<WordList> allList = wordListService.getWordListsByUserAndName(user, "All");
         if (allList.isEmpty()) return ResponseEntity.badRequest().build();
@@ -83,12 +89,13 @@ public class WordController {
 
     @PutMapping("/addToWordList")
     public ResponseEntity<WordDTO> addWordToWordList(
-            @RequestParam Long userId,
+            @RequestParam(required = false) Long userId,
             @RequestParam long wordListId,
             @RequestBody WordDTO wordDTO
     ) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         User user = new User();
-        user.setId(userId);
+        user.setId(authenticatedUserId);
 
         Optional<WordList> targetListOpt = wordListService.getWordListsByUserAndWordListId(user, wordListId);
         if (targetListOpt.isEmpty()) return ResponseEntity.notFound().build();
@@ -106,9 +113,10 @@ public class WordController {
     }
 
     @DeleteMapping("/delete")
-    public ResponseEntity<WordDTO> deleteWord(@RequestParam Long userId, @RequestParam Long wordId) {
+    public ResponseEntity<WordDTO> deleteWord(@RequestParam(required = false) Long userId, @RequestParam Long wordId) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         User user = new User();
-        user.setId(userId);
+        user.setId(authenticatedUserId);
 
         List<WordList> wordLists = wordListService.getWordListsByUser(user);
         if (wordLists == null || wordLists.isEmpty()) return ResponseEntity.badRequest().build();
@@ -128,12 +136,13 @@ public class WordController {
 
     @PutMapping("/update")
     public ResponseEntity<WordDTO> updateWord(
-            @RequestParam Long userId,
+            @RequestParam(required = false) Long userId,
             @RequestParam Long wordId,
             @RequestBody WordDTO wordDTO
     ) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         User user = new User();
-        user.setId(userId);
+        user.setId(authenticatedUserId);
 
         List<WordList> wordLists = wordListService.getWordListsByUser(user);
         if (wordLists == null || wordLists.isEmpty()) return ResponseEntity.badRequest().build();
@@ -158,12 +167,13 @@ public class WordController {
 
     @PutMapping("/updateStarred")
     public ResponseEntity<WordDTO> updateStarred(
-            @RequestParam Long userId,
+            @RequestParam(required = false) Long userId,
             @RequestParam Long wordId,
             @RequestParam boolean starred
     ) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         User user = new User();
-        user.setId(userId);
+        user.setId(authenticatedUserId);
 
         List<WordList> wordLists = wordListService.getWordListsByUser(user);
         if (wordLists == null || wordLists.isEmpty()) return ResponseEntity.badRequest().build();
