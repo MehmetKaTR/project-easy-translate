@@ -1,0 +1,33 @@
+package com.mehmetkatr.project_easy_translate.controller;
+
+import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateRequest;
+import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateResponse;
+import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
+import com.mehmetkatr.project_easy_translate.service.StoryGenerationService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/story")
+@RequiredArgsConstructor
+public class StoryGenerationController {
+
+    private final StoryGenerationService storyGenerationService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
+
+    @PostMapping("/generate")
+    public ResponseEntity<StoryGenerateResponse> generateStory(
+            @RequestParam(required = false) Long userId,
+            @Valid @RequestBody StoryGenerateRequest request
+    ) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
+        StoryGenerateResponse response = storyGenerationService.generateStory(authenticatedUserId, request);
+        return ResponseEntity.ok(response);
+    }
+}

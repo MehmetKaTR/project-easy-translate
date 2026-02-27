@@ -1,0 +1,250 @@
+package com.mehmetkatr.project_easy_translate.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateRequest;
+import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateResponse;
+import com.mehmetkatr.project_easy_translate.entity.LlmModel;
+import com.mehmetkatr.project_easy_translate.entity.TokenUsageLog;
+import com.mehmetkatr.project_easy_translate.entity.User;
+import com.mehmetkatr.project_easy_translate.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClient;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.List;
+import java.util.Arrays;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class StoryGenerationService {
+
+    private final ObjectMapper objectMapper;
+    private final UserRepository userRepository;
+    private final TokenUsageLogService tokenUsageLogService;
+    private final LlmModelService llmModelService;
+
+    @Value("${gemini.api-key:}")
+    private String geminiApiKey;
+
+    @Value("${gemini.model:gemini-1.5-flash}")
+    private String geminiModel;
+
+    @Value("${gemini.fallback-models:gemini-2.0-flash,gemini-2.0-flash-lite,gemini-1.5-flash-latest}")
+    private String geminiFallbackModels;
+
+    @Value("${gemini.api-version:v1beta}")
+    private String geminiApiVersion;
+
+    @Value("${app.free.daily-token-limit:15000}")
+    private int freeDailyTokenLimit;
+
+    public StoryGenerateResponse generateStory(Long userId, StoryGenerateRequest request) {
+        if (geminiApiKey == null || geminiApiKey.isBlank()) {
+            throw new IllegalArgumentException("Gemini API key is not configured");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        validateFreeUserDailyLimit(user);
+
+        String selectedModel = null;
+        String prompt = buildPrompt(request);
+        String responseText = null;
+
+        HttpClientErrorException.TooManyRequests lastQuotaError = null;
+        for (String modelCandidate : resolveModelCandidates()) {
+            try {
+                responseText = callGemini(prompt, modelCandidate);
+                selectedModel = modelCandidate;
+                break;
+            } catch (HttpClientErrorException.NotFound ex) {
+                // Try next model candidate
+            } catch (HttpClientErrorException.TooManyRequests ex) {
+                lastQuotaError = ex;
+            }
+        }
+
+        if (responseText == null || selectedModel == null) {
+            if (lastQuotaError != null) {
+                throw new IllegalArgumentException("Gemini quota exceeded for all configured models. Try again later or change model/key.");
+            }
+            throw new IllegalArgumentException("No compatible Gemini model found. Update GEMINI_MODEL/GEMINI_FALLBACK_MODELS.");
+        }
+
+        ensureActiveModelRecord(selectedModel);
+
+        String rawJson = extractGeminiText(responseText);
+        ParsedStory parsedStory = parseModelOutput(rawJson);
+        int tokensUsed = extractTokensUsed(responseText);
+        persistTokenUsage(user, tokensUsed);
+
+        return StoryGenerateResponse.builder()
+                .title(parsedStory.title())
+                .story(parsedStory.storyEn())
+                .turkishTranslation(parsedStory.storyTr())
+                .model(selectedModel)
+                .tokensUsed(tokensUsed)
+                .build();
+    }
+
+    private String buildPrompt(StoryGenerateRequest request) {
+        String words = request.getWords().stream()
+                .map(StoryGenerateRequest.WordItem::getWord)
+                .map(String::trim)
+                .filter(w -> !w.isBlank())
+                .collect(Collectors.joining(", "));
+
+        return """
+                You are an English learning assistant.
+                
+                Write a story and return only valid JSON.
+                
+                Constraints:
+                - CEFR level: %s
+                - Topic: %s
+                - Sentiment: %s
+                - Length: %s
+                - Must naturally include all words: %s
+                
+                Output JSON schema:
+                {
+                  "title": "max 8 words",
+                  "story_en": "English story only",
+                  "story_tr": "Turkish translation of the English story"
+                }
+                
+                Rules:
+                - No markdown
+                - No extra keys
+                - story_en must be CEFR %s compatible
+                - story_tr must be natural Turkish translation
+                """.formatted(
+                request.getLevel(),
+                request.getTopic(),
+                request.getSentiment(),
+                request.getLength(),
+                words,
+                request.getLevel()
+        );
+    }
+
+    private String callGemini(String prompt, String modelName) {
+        Map<String, Object> payload = Map.of(
+                "contents", new Object[]{
+                        Map.of("parts", new Object[]{Map.of("text", prompt)})
+                },
+                "generationConfig", Map.of(
+                        "temperature", 0.7,
+                        "responseMimeType", "application/json"
+                )
+        );
+
+        return RestClient.create()
+                .post()
+                .uri(uriBuilder -> uriBuilder
+                        .scheme("https")
+                        .host("generativelanguage.googleapis.com")
+                        .path("/" + geminiApiVersion + "/models/" + modelName + ":generateContent")
+                        .queryParam("key", geminiApiKey)
+                        .build())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(payload)
+                .retrieve()
+                .body(String.class);
+    }
+
+    private List<String> resolveModelCandidates() {
+        return Arrays.stream((geminiModel + "," + geminiFallbackModels).split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private String extractGeminiText(String responseText) {
+        try {
+            JsonNode root = objectMapper.readTree(responseText == null ? "{}" : responseText);
+            return root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText("");
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Gemini response parsing failed");
+        }
+    }
+
+    private ParsedStory parseModelOutput(String rawJson) {
+        try {
+            JsonNode root = objectMapper.readTree(rawJson == null ? "{}" : rawJson);
+            String title = root.path("title").asText("New Story").trim();
+            String storyEn = root.path("story_en").asText("").trim();
+            String storyTr = root.path("story_tr").asText("").trim();
+
+            if (storyEn.isBlank()) {
+                throw new IllegalArgumentException("Gemini returned empty story");
+            }
+
+            if (title.isBlank()) title = "New Story";
+            return new ParsedStory(title, storyEn, storyTr);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Gemini output is not valid JSON");
+        }
+    }
+
+    private int extractTokensUsed(String responseText) {
+        try {
+            JsonNode root = objectMapper.readTree(responseText == null ? "{}" : responseText);
+            JsonNode usage = root.path("usageMetadata");
+            int total = usage.path("totalTokenCount").asInt(0);
+            if (total > 0) return total;
+            return usage.path("promptTokenCount").asInt(0) + usage.path("candidatesTokenCount").asInt(0);
+        } catch (Exception ex) {
+            return 0;
+        }
+    }
+
+    private void persistTokenUsage(User user, int tokensUsed) {
+        TokenUsageLog log = TokenUsageLog.builder()
+                .user(user)
+                .storyId("GEN-" + UUID.randomUUID())
+                .tokensUsed(Math.max(tokensUsed, 0))
+                .build();
+        tokenUsageLogService.save(log);
+    }
+
+    private void validateFreeUserDailyLimit(User user) {
+        if (freeDailyTokenLimit <= 0) return;
+        if (user.getSubscriptionLevel() != User.SubscriptionLevel.FREE) return;
+
+        LocalDate today = LocalDate.now();
+        LocalDateTime start = today.atStartOfDay();
+        LocalDateTime end = today.plusDays(1).atStartOfDay();
+        int usedToday = tokenUsageLogService.sumTokensByUserBetween(user, start, end);
+
+        if (usedToday >= freeDailyTokenLimit) {
+            throw new IllegalArgumentException(
+                    "Daily free token limit reached. Please try tomorrow or upgrade your plan."
+            );
+        }
+    }
+
+    private void ensureActiveModelRecord(String modelName) {
+        boolean exists = llmModelService.findByName(modelName).stream()
+                .anyMatch(model -> model.getStatus() == LlmModel.Status.ACTIVE);
+        if (exists) return;
+
+        llmModelService.save(LlmModel.builder()
+                .name(modelName)
+                .description("Gemini model for story generation")
+                .status(LlmModel.Status.ACTIVE)
+                .build());
+    }
+
+    private record ParsedStory(String title, String storyEn, String storyTr) {}
+}

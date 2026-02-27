@@ -31,6 +31,9 @@ public class Story {
 
     private String content;
 
+    @Field("turkish_translation")
+    private String turkishTranslation;
+
     private String language;
 
     @Builder.Default
