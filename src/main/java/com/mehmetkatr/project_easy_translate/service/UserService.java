@@ -1,15 +1,21 @@
 package com.mehmetkatr.project_easy_translate.service;
 
+import com.mehmetkatr.project_easy_translate.dto.auth.AccountDeletionResponse;
 import com.mehmetkatr.project_easy_translate.dto.auth.AuthResponse;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
+import com.mehmetkatr.project_easy_translate.exception.AccountPendingDeletionException;
+import com.mehmetkatr.project_easy_translate.exception.AuthenticationFailedException;
+import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +28,9 @@ public class UserService {
     private final WordListRepository wordListRepository;
     private final PasswordEncoder passwordEncoder;
     private final GoogleTokenVerifierService googleTokenVerifierService;
+
+    @Value("${app.account.deletion.grace-days:7}")
+    private int accountDeletionGraceDays;
 
     public List<User> findAll() {
         return userRepository.findAll();
@@ -41,58 +50,59 @@ public class UserService {
 
     @Transactional
     public User registerUser(String username, String email, String rawPassword) {
-        if (userRepository.findByEmail(email).isPresent()) {
-            throw new RuntimeException("Email already exists");
-        }
-        if (userRepository.findByUsername(username).isPresent()) {
-            throw new RuntimeException("Username already exists");
-        }
+        purgeExpiredPendingDeletions();
+
+        String normalizedUsername = normalizeUsername(username);
+        String normalizedEmail = normalizeEmail(email);
+
+        userRepository.findFirstByEmailIgnoreCase(normalizedEmail)
+                .ifPresent(this::throwRegistrationConflictForEmail);
+
+        userRepository.findFirstByUsernameIgnoreCase(normalizedUsername)
+                .ifPresent(this::throwRegistrationConflictForUsername);
 
         User user = User.builder()
-                .username(username)
-                .email(email)
+                .username(normalizedUsername)
+                .email(normalizedEmail)
                 .passwordHash(passwordEncoder.encode(rawPassword))
                 .subscriptionLevel(User.SubscriptionLevel.FREE)
                 .tokenBalance(0)
+                .pendingDeletion(false)
                 .build();
 
         User savedUser = userRepository.save(user);
-
-        WordList generalList = WordList.builder()
-                .name("All")
-                .user(savedUser)
-                .hexColorCode("#EEEEEE")
-                .build();
-        wordListRepository.save(generalList);
-
-        // JWT artık sadece username veya subscriptionLevel içerebilir
+        ensureDefaultWordList(savedUser);
         return savedUser;
     }
 
     @Transactional
     public User registerOrLoginSocial(String email, String username) {
-        Optional<User> existingUser = userRepository.findByEmail(email);
+        purgeExpiredPendingDeletions();
+
+        String normalizedEmail = normalizeEmail(email);
+        String normalizedUsername = normalizeUsername(username);
+
+        Optional<User> existingUser = userRepository.findFirstByEmailIgnoreCase(normalizedEmail);
         if (existingUser.isPresent()) {
-            return existingUser.get();
+            User user = existingUser.get();
+            assertAccountNotPendingDeletion(user);
+            return user;
         }
 
+        userRepository.findFirstByUsernameIgnoreCase(normalizedUsername)
+                .ifPresent(this::throwRegistrationConflictForUsername);
+
         User user = User.builder()
-                .username(username)
-                .email(email)
-                .passwordHash("") // social login: şifre gerekmez
+                .username(normalizedUsername)
+                .email(normalizedEmail)
+                .passwordHash("")
                 .subscriptionLevel(User.SubscriptionLevel.FREE)
                 .tokenBalance(0)
+                .pendingDeletion(false)
                 .build();
 
         User savedUser = userRepository.save(user);
-
-        WordList generalList = WordList.builder()
-                .name("All")
-                .user(savedUser)
-                .hexColorCode("#EEEEEE")
-                .build();
-        wordListRepository.save(generalList);
-
+        ensureDefaultWordList(savedUser);
         return savedUser;
     }
 
@@ -104,11 +114,15 @@ public class UserService {
     }
 
     public AuthResponse login(String username, String rawPassword) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid username or password"));
+        String normalizedUsername = normalizeUsername(username);
+
+        User user = userRepository.findFirstByUsernameIgnoreCase(normalizedUsername)
+                .orElseThrow(() -> new AuthenticationFailedException("Invalid username or password"));
+
+        assertAccountNotPendingDeletion(user);
 
         if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
-            throw new IllegalArgumentException("Invalid username or password");
+            throw new AuthenticationFailedException("Invalid username or password");
         }
 
         String token = tokenService.generateToken(user.getUsername(), "ROLE_USER");
@@ -128,12 +142,102 @@ public class UserService {
         return socialLogin(googleUser.email(), googleUser.username());
     }
 
+    @Transactional
+    public AccountDeletionResponse requestAccountDeletion(String authenticatedUsername) {
+        User user = userRepository.findByUsername(authenticatedUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found"));
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime scheduledAt = now.plusDays(Math.max(1, accountDeletionGraceDays));
+
+        if (user.isPendingDeletion() && user.getDeletionScheduledAt() != null && user.getDeletionScheduledAt().isAfter(now)) {
+            return AccountDeletionResponse.builder()
+                    .status("PENDING_DELETION")
+                    .message("Your account deletion request is already active")
+                    .scheduledDeletionAt(user.getDeletionScheduledAt().toString())
+                    .graceDays(Math.max(1, accountDeletionGraceDays))
+                    .build();
+        }
+
+        user.setPendingDeletion(true);
+        user.setDeletionRequestedAt(now);
+        user.setDeletionScheduledAt(scheduledAt);
+        userRepository.save(user);
+
+        return AccountDeletionResponse.builder()
+                .status("PENDING_DELETION")
+                .message("Your account will be permanently deleted after the grace period")
+                .scheduledDeletionAt(scheduledAt.toString())
+                .graceDays(Math.max(1, accountDeletionGraceDays))
+                .build();
+    }
+
+    @Transactional
+    public int purgeExpiredPendingDeletions() {
+        List<User> expiredUsers = userRepository.findByPendingDeletionTrueAndDeletionScheduledAtBefore(LocalDateTime.now());
+        if (expiredUsers.isEmpty()) {
+            return 0;
+        }
+
+        userRepository.deleteAll(expiredUsers);
+        return expiredUsers.size();
+    }
+
+    private void ensureDefaultWordList(User savedUser) {
+        WordList generalList = WordList.builder()
+                .name("All")
+                .user(savedUser)
+                .hexColorCode("#EEEEEE")
+                .build();
+        wordListRepository.save(generalList);
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
+    }
+
+    private String normalizeUsername(String username) {
+        return username == null ? "" : username.trim();
+    }
+
+    private void throwRegistrationConflictForEmail(User existingUser) {
+        assertAccountNotPendingDeletion(existingUser);
+        throw new ResourceConflictException("EMAIL_ALREADY_EXISTS", "This email is already in use");
+    }
+
+    private void throwRegistrationConflictForUsername(User existingUser) {
+        assertAccountNotPendingDeletion(existingUser);
+        throw new ResourceConflictException("USERNAME_ALREADY_EXISTS", "This username is already in use");
+    }
+
+    private void assertAccountNotPendingDeletion(User user) {
+        if (!user.isPendingDeletion()) {
+            return;
+        }
+
+        LocalDateTime scheduledAt = user.getDeletionScheduledAt();
+        if (scheduledAt == null) {
+            throw new AccountPendingDeletionException(
+                    "This account is pending deletion",
+                    LocalDateTime.now().plusDays(Math.max(1, accountDeletionGraceDays))
+            );
+        }
+
+        if (scheduledAt.isAfter(LocalDateTime.now())) {
+            throw new AccountPendingDeletionException(
+                    "This account is pending deletion. You can try again after the grace period",
+                    scheduledAt
+            );
+        }
+    }
+
     private AuthResponse buildAuthResponse(User user, String token) {
         return AuthResponse.builder()
                 .userId(user.getId())
                 .username(user.getUsername())
                 .token(token)
                 .tokenType("Bearer")
+                .plan(user.getSubscriptionLevel().name())
                 .build();
     }
 }

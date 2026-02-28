@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -19,7 +20,8 @@ import java.util.List;
         name = "users",
         indexes = {
                 @Index(name = "idx_users_username", columnList = "username"),
-                @Index(name = "idx_users_email", columnList = "email")
+                @Index(name = "idx_users_email", columnList = "email"),
+                @Index(name = "idx_users_pending_deletion", columnList = "pending_deletion,deletion_scheduled_at")
         }
 )
 public class User extends BaseEntity {
@@ -51,6 +53,16 @@ public class User extends BaseEntity {
     @Column(name = "token_balance", nullable = false)
     private int tokenBalance;
 
+    @Builder.Default
+    @Column(name = "pending_deletion", nullable = false)
+    private boolean pendingDeletion = false;
+
+    @Column(name = "deletion_requested_at")
+    private LocalDateTime deletionRequestedAt;
+
+    @Column(name = "deletion_scheduled_at")
+    private LocalDateTime deletionScheduledAt;
+
     // ---------------- Relationships ----------------
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<WordList> wordLists;
@@ -61,7 +73,6 @@ public class User extends BaseEntity {
     @OneToMany(mappedBy = "targetUser", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AdminActionLog> targetUserActions;
 
-    //cascade = Parent uzerinde yapilan islemleri (save, delete, update) child’a da uygular
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ImportExportLog> importExportLogs;
 

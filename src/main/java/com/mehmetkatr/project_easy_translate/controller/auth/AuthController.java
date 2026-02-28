@@ -1,5 +1,6 @@
 package com.mehmetkatr.project_easy_translate.controller.auth;
 
+import com.mehmetkatr.project_easy_translate.dto.auth.AccountDeletionResponse;
 import com.mehmetkatr.project_easy_translate.dto.auth.AuthResponse;
 import com.mehmetkatr.project_easy_translate.dto.auth.GoogleTokenLoginRequest;
 import com.mehmetkatr.project_easy_translate.dto.auth.LoginRequest;
@@ -10,6 +11,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,6 +47,13 @@ public class AuthController {
     @PostMapping("/social/google/dev")
     public ResponseEntity<AuthResponse> socialGoogleDevLogin(@Valid @RequestBody SocialLoginRequest request) {
         AuthResponse response = userService.socialLogin(request.getEmail(), request.getUsername());
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/account")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AccountDeletionResponse> requestDeleteAccount(Authentication authentication) {
+        AccountDeletionResponse response = userService.requestAccountDeletion(authentication.getName());
         return ResponseEntity.ok(response);
     }
 }
