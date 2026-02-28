@@ -7,6 +7,7 @@ import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateResponse;
 import com.mehmetkatr.project_easy_translate.entity.LlmModel;
 import com.mehmetkatr.project_easy_translate.entity.TokenUsageLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
+import com.mehmetkatr.project_easy_translate.exception.DailyStoryLimitExceededException;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Arrays;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,8 +46,11 @@ public class StoryGenerationService {
     @Value("${gemini.api-version:v1beta}")
     private String geminiApiVersion;
 
-    @Value("${app.free.daily-token-limit:15000}")
-    private int freeDailyTokenLimit;
+    @Value("${app.story-limit.free-daily:3}")
+    private int freeDailyStoryLimit;
+
+    @Value("${app.story-limit.premium-daily:20}")
+    private int premiumDailyStoryLimit;
 
     public StoryGenerateResponse generateStory(Long userId, StoryGenerateRequest request) {
         if (geminiApiKey == null || geminiApiKey.isBlank()) {
@@ -54,7 +59,7 @@ public class StoryGenerationService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        validateFreeUserDailyLimit(user);
+        validateDailyStoryGenerationLimit(user);
 
         String selectedModel = null;
         String prompt = buildPrompt(request);
@@ -218,20 +223,32 @@ public class StoryGenerationService {
         tokenUsageLogService.save(log);
     }
 
-    private void validateFreeUserDailyLimit(User user) {
-        if (freeDailyTokenLimit <= 0) return;
-        if (user.getSubscriptionLevel() != User.SubscriptionLevel.FREE) return;
+    private void validateDailyStoryGenerationLimit(User user) {
+        int dailyLimit = resolveDailyLimit(user.getSubscriptionLevel());
+        if (dailyLimit <= 0) return;
 
         LocalDate today = LocalDate.now();
         LocalDateTime start = today.atStartOfDay();
-        LocalDateTime end = today.plusDays(1).atStartOfDay();
-        int usedToday = tokenUsageLogService.sumTokensByUserBetween(user, start, end);
+        LocalDateTime resetAt = today.plusDays(1).atStartOfDay();
+        long usedToday = tokenUsageLogService.countByUserBetween(user, start, resetAt);
 
-        if (usedToday >= freeDailyTokenLimit) {
-            throw new IllegalArgumentException(
-                    "Daily free token limit reached. Please try tomorrow or upgrade your plan."
+        if (usedToday >= dailyLimit) {
+            String resetAtText = resetAt.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+            throw new DailyStoryLimitExceededException(
+                    "Gunluk hikaye limiti doldu (" + usedToday + "/" + dailyLimit + "). "
+                            + "Bir sonraki hak yenilenme zamani: " + resetAtText + ". Premium'a gec.",
+                    dailyLimit,
+                    (int) usedToday,
+                    resetAt
             );
         }
+    }
+
+    private int resolveDailyLimit(User.SubscriptionLevel subscriptionLevel) {
+        if (subscriptionLevel == User.SubscriptionLevel.PREMIUM) {
+            return premiumDailyStoryLimit;
+        }
+        return freeDailyStoryLimit;
     }
 
     private void ensureActiveModelRecord(String modelName) {

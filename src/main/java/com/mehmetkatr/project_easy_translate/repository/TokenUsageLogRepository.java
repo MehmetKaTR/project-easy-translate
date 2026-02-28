@@ -22,4 +22,11 @@ public interface TokenUsageLogRepository extends JpaRepository<TokenUsageLog, Lo
             @Param("end") LocalDateTime end
     );
 
+    @Query("SELECT COUNT(t) FROM TokenUsageLog t WHERE t.user = :user AND t.createdAt >= :start AND t.createdAt < :end")
+    Long countByUserBetween(
+            @Param("user") User user,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
 }

@@ -19,6 +19,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
     }
 
+    @ExceptionHandler(DailyStoryLimitExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleDailyStoryLimit(DailyStoryLimitExceededException exception) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                "error", exception.getMessage(),
+                "dailyLimit", exception.getDailyLimit(),
+                "usedToday", exception.getUsedToday(),
+                "resetAt", exception.getResetAt().toString()
+        ));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, String>> handleAccessDenied(AccessDeniedException exception) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", exception.getMessage()));
