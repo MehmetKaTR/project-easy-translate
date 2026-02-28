@@ -1,6 +1,5 @@
 package com.mehmetkatr.project_easy_translate.service;
 
-import com.mehmetkatr.project_easy_translate.entity.ImportExportLog;
 import com.mehmetkatr.project_easy_translate.entity.LlmModel;
 import com.mehmetkatr.project_easy_translate.repository.LlmModelRepository;
 import jakarta.transaction.Transactional;
