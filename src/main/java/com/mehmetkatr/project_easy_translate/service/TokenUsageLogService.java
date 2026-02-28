@@ -39,4 +39,9 @@ public class TokenUsageLogService {
         return total == null ? 0 : total.intValue();
     }
 
+    public long countByUserBetween(User user, LocalDateTime start, LocalDateTime end) {
+        Long total = tokenUsageLogRepository.countByUserBetween(user, start, end);
+        return total == null ? 0L : total;
+    }
+
 }
