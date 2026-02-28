@@ -7,12 +7,8 @@ import lombok.Getter;
 @Getter
 @Builder
 @AllArgsConstructor
-public class AuthResponse {
+public class UserPreferencesResponse {
     private Long userId;
-    private String username;
-    private String token;
-    private String tokenType;
-    private String plan;
     private String preferredLanguage;
     private String themePreference;
 }

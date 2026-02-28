@@ -63,6 +63,16 @@ public class User extends BaseEntity {
     @Column(name = "deletion_scheduled_at")
     private LocalDateTime deletionScheduledAt;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "preferred_language", nullable = false)
+    private PreferredLanguage preferredLanguage = PreferredLanguage.TR;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "theme_preference", nullable = false)
+    private ThemePreference themePreference = ThemePreference.LIGHT;
+
     // ---------------- Relationships ----------------
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<WordList> wordLists;
@@ -79,5 +89,15 @@ public class User extends BaseEntity {
     public enum SubscriptionLevel {
         FREE,
         PREMIUM
+    }
+
+    public enum PreferredLanguage {
+        TR,
+        EN
+    }
+
+    public enum ThemePreference {
+        LIGHT,
+        DARK
     }
 }
