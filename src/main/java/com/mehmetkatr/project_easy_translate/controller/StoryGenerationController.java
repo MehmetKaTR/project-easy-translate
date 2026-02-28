@@ -2,11 +2,13 @@ package com.mehmetkatr.project_easy_translate.controller;
 
 import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateRequest;
 import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateResponse;
+import com.mehmetkatr.project_easy_translate.dto.story.StoryLimitStatusResponse;
 import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.service.StoryGenerationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,6 +30,15 @@ public class StoryGenerationController {
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         StoryGenerateResponse response = storyGenerationService.generateStory(authenticatedUserId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/limit-status")
+    public ResponseEntity<StoryLimitStatusResponse> getLimitStatus(
+            @RequestParam(required = false) Long userId
+    ) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
+        StoryLimitStatusResponse response = storyGenerationService.getDailyLimitStatus(authenticatedUserId);
         return ResponseEntity.ok(response);
     }
 }

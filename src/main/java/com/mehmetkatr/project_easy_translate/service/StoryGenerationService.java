@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateRequest;
 import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateResponse;
+import com.mehmetkatr.project_easy_translate.dto.story.StoryLimitStatusResponse;
 import com.mehmetkatr.project_easy_translate.entity.LlmModel;
 import com.mehmetkatr.project_easy_translate.entity.TokenUsageLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
@@ -16,13 +17,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
-import java.util.Map;
-import java.util.UUID;
-import java.util.List;
-import java.util.Arrays;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -98,6 +99,28 @@ public class StoryGenerationService {
                 .turkishTranslation(parsedStory.storyTr())
                 .model(selectedModel)
                 .tokensUsed(tokensUsed)
+                .build();
+    }
+
+    public StoryLimitStatusResponse getDailyLimitStatus(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        int dailyLimit = resolveDailyLimit(user.getSubscriptionLevel());
+        LocalDate today = LocalDate.now();
+        LocalDateTime start = today.atStartOfDay();
+        LocalDateTime resetAt = today.plusDays(1).atStartOfDay();
+        long usedTodayLong = tokenUsageLogService.countByUserBetween(user, start, resetAt);
+        int usedToday = (int) Math.min(Integer.MAX_VALUE, usedTodayLong);
+        int remainingToday = Math.max(0, dailyLimit - usedToday);
+
+        return StoryLimitStatusResponse.builder()
+                .dailyLimit(dailyLimit)
+                .usedToday(usedToday)
+                .remainingToday(remainingToday)
+                .resetAt(resetAt.toString())
+                .limitReached(usedToday >= dailyLimit)
+                .plan(user.getSubscriptionLevel().name())
                 .build();
     }
 
