@@ -2,7 +2,6 @@ package com.mehmetkatr.project_easy_translate.service;
 
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
-import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
@@ -17,7 +16,6 @@ import java.util.List;
 public class WordService {
 
     private final WordRepository wordRepository;
-    private final WordListRepository wordListRepository;
 
     public List<Word> getWordsByWordList(WordList wordList) {
         return wordRepository.findByWordList(wordList);
