@@ -70,7 +70,7 @@ public class UserService {
                 .subscriptionLevel(User.SubscriptionLevel.FREE)
                 .tokenBalance(0)
                 .pendingDeletion(false)
-                .preferredLanguage(User.PreferredLanguage.TR)
+                .preferredLanguage(User.PreferredLanguage.EN)
                 .themePreference(User.ThemePreference.LIGHT)
                 .build();
 
@@ -103,7 +103,7 @@ public class UserService {
                 .subscriptionLevel(User.SubscriptionLevel.FREE)
                 .tokenBalance(0)
                 .pendingDeletion(false)
-                .preferredLanguage(User.PreferredLanguage.TR)
+                .preferredLanguage(User.PreferredLanguage.EN)
                 .themePreference(User.ThemePreference.LIGHT)
                 .build();
 
