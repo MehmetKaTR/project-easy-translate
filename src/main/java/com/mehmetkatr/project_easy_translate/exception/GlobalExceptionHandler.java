@@ -14,14 +14,43 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(AuthenticationFailedException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthenticationFailed(AuthenticationFailedException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "code", "INVALID_CREDENTIALS",
+                "error", exception.getMessage()
+        ));
+    }
+
+    @ExceptionHandler(ResourceConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleResourceConflict(ResourceConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "code", exception.getCode(),
+                "error", exception.getMessage()
+        ));
+    }
+
+    @ExceptionHandler(AccountPendingDeletionException.class)
+    public ResponseEntity<Map<String, Object>> handlePendingDeletion(AccountPendingDeletionException exception) {
+        return ResponseEntity.status(HttpStatus.LOCKED).body(Map.of(
+                "code", "ACCOUNT_PENDING_DELETION",
+                "error", exception.getMessage(),
+                "retryAt", exception.getRetryAt().toString()
+        ));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest().body(Map.of(
+                "code", "BAD_REQUEST",
+                "error", exception.getMessage()
+        ));
     }
 
     @ExceptionHandler(DailyStoryLimitExceededException.class)
     public ResponseEntity<Map<String, Object>> handleDailyStoryLimit(DailyStoryLimitExceededException exception) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                "code", "STORY_DAILY_LIMIT_REACHED",
                 "error", exception.getMessage(),
                 "dailyLimit", exception.getDailyLimit(),
                 "usedToday", exception.getUsedToday(),
@@ -30,8 +59,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Map<String, String>> handleAccessDenied(AccessDeniedException exception) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", exception.getMessage()));
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "code", "ACCESS_DENIED",
+                "error", exception.getMessage()
+        ));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -42,6 +74,7 @@ public class GlobalExceptionHandler {
         }
 
         return ResponseEntity.badRequest().body(Map.of(
+                "code", "VALIDATION_ERROR",
                 "error", "Validation failed",
                 "fields", fieldErrors
         ));

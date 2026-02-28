@@ -7,10 +7,9 @@ import lombok.Getter;
 @Getter
 @Builder
 @AllArgsConstructor
-public class AuthResponse {
-    private Long userId;
-    private String username;
-    private String token;
-    private String tokenType;
-    private String plan;
+public class AccountDeletionResponse {
+    private String status;
+    private String message;
+    private String scheduledDeletionAt;
+    private Integer graceDays;
 }
