@@ -2,6 +2,7 @@ package com.mehmetkatr.project_easy_translate.service;
 
 import com.mehmetkatr.project_easy_translate.dto.auth.AccountDeletionResponse;
 import com.mehmetkatr.project_easy_translate.dto.auth.AuthResponse;
+import com.mehmetkatr.project_easy_translate.dto.auth.UserPreferencesResponse;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import com.mehmetkatr.project_easy_translate.exception.AccountPendingDeletionException;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -68,6 +70,8 @@ public class UserService {
                 .subscriptionLevel(User.SubscriptionLevel.FREE)
                 .tokenBalance(0)
                 .pendingDeletion(false)
+                .preferredLanguage(User.PreferredLanguage.TR)
+                .themePreference(User.ThemePreference.LIGHT)
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -99,6 +103,8 @@ public class UserService {
                 .subscriptionLevel(User.SubscriptionLevel.FREE)
                 .tokenBalance(0)
                 .pendingDeletion(false)
+                .preferredLanguage(User.PreferredLanguage.TR)
+                .themePreference(User.ThemePreference.LIGHT)
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -172,6 +178,28 @@ public class UserService {
                 .build();
     }
 
+    public UserPreferencesResponse getPreferences(String authenticatedUsername) {
+        User user = userRepository.findByUsername(authenticatedUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found"));
+        return toPreferencesResponse(user);
+    }
+
+    @Transactional
+    public UserPreferencesResponse updatePreferences(String authenticatedUsername, String preferredLanguage, String themePreference) {
+        User user = userRepository.findByUsername(authenticatedUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found"));
+
+        if (preferredLanguage != null && !preferredLanguage.isBlank()) {
+            user.setPreferredLanguage(parsePreferredLanguage(preferredLanguage));
+        }
+        if (themePreference != null && !themePreference.isBlank()) {
+            user.setThemePreference(parseThemePreference(themePreference));
+        }
+
+        User saved = userRepository.save(user);
+        return toPreferencesResponse(saved);
+    }
+
     @Transactional
     public int purgeExpiredPendingDeletions() {
         List<User> expiredUsers = userRepository.findByPendingDeletionTrueAndDeletionScheduledAtBefore(LocalDateTime.now());
@@ -231,6 +259,32 @@ public class UserService {
         }
     }
 
+    private User.PreferredLanguage parsePreferredLanguage(String value) {
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        try {
+            return User.PreferredLanguage.valueOf(normalized);
+        } catch (Exception ignored) {
+            throw new IllegalArgumentException("Invalid preferredLanguage. Allowed values: TR, EN");
+        }
+    }
+
+    private User.ThemePreference parseThemePreference(String value) {
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        try {
+            return User.ThemePreference.valueOf(normalized);
+        } catch (Exception ignored) {
+            throw new IllegalArgumentException("Invalid themePreference. Allowed values: LIGHT, DARK");
+        }
+    }
+
+    private UserPreferencesResponse toPreferencesResponse(User user) {
+        return UserPreferencesResponse.builder()
+                .userId(user.getId())
+                .preferredLanguage(user.getPreferredLanguage().name())
+                .themePreference(user.getThemePreference().name())
+                .build();
+    }
+
     private AuthResponse buildAuthResponse(User user, String token) {
         return AuthResponse.builder()
                 .userId(user.getId())
@@ -238,6 +292,8 @@ public class UserService {
                 .token(token)
                 .tokenType("Bearer")
                 .plan(user.getSubscriptionLevel().name())
+                .preferredLanguage(user.getPreferredLanguage().name())
+                .themePreference(user.getThemePreference().name())
                 .build();
     }
 }
