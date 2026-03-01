@@ -114,11 +114,10 @@ public class UserService {
             return user;
         }
 
-        userRepository.findFirstByUsernameIgnoreCase(normalizedUsername)
-                .ifPresent(this::throwRegistrationConflictForUsername);
+        String resolvedUsername = resolveAvailableSocialUsername(normalizedUsername);
 
         User user = User.builder()
-                .username(normalizedUsername)
+                .username(resolvedUsername)
                 .email(normalizedEmail)
                 .passwordHash("")
                 .emailVerified(true)
@@ -362,6 +361,33 @@ public class UserService {
 
     private String normalizeUsername(String username) {
         return username == null ? "" : username.trim();
+    }
+
+    private String resolveAvailableSocialUsername(String preferredUsername) {
+        String base = preferredUsername == null ? "" : preferredUsername.trim();
+        if (base.isBlank()) {
+            base = "user";
+        }
+        if (base.length() > 40) {
+            base = base.substring(0, 40);
+        }
+
+        if (userRepository.findFirstByUsernameIgnoreCase(base).isEmpty()) {
+            return base;
+        }
+
+        for (int i = 0; i < 50; i++) {
+            String suffix = String.valueOf(ThreadLocalRandom.current().nextInt(1000, 9999));
+            String candidate = (base + "_" + suffix);
+            if (candidate.length() > 50) {
+                candidate = candidate.substring(0, 50);
+            }
+            if (userRepository.findFirstByUsernameIgnoreCase(candidate).isEmpty()) {
+                return candidate;
+            }
+        }
+
+        throw new ResourceConflictException("USERNAME_ALREADY_EXISTS", "Could not allocate a unique username for social login");
     }
 
     private Optional<User> findByIdentifier(String identifier) {
