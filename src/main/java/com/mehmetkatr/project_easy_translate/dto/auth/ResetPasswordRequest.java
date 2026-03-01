@@ -1,6 +1,5 @@
 package com.mehmetkatr.project_easy_translate.dto.auth;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -9,8 +8,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class ResetPasswordRequest {
-    @NotBlank(message = "Email is required")
-    @Email(message = "Please enter a valid email address")
+    @NotBlank(message = "Username or email is required")
     private String email;
 
     @NotBlank(message = "Reset code is required")

@@ -223,9 +223,8 @@ public class UserService {
     }
 
     @Transactional
-    public void requestPasswordReset(String email) {
-        String normalizedEmail = normalizeEmail(email);
-        Optional<User> userOpt = userRepository.findFirstByEmailIgnoreCase(normalizedEmail);
+    public void requestPasswordReset(String identifier) {
+        Optional<User> userOpt = findByIdentifier(identifier);
         if (userOpt.isEmpty()) {
             return;
         }
@@ -238,9 +237,8 @@ public class UserService {
     }
 
     @Transactional
-    public void resetPassword(String email, String code, String newPassword) {
-        String normalizedEmail = normalizeEmail(email);
-        User user = userRepository.findFirstByEmailIgnoreCase(normalizedEmail)
+    public void resetPassword(String identifier, String code, String newPassword) {
+        User user = findByIdentifier(identifier)
                 .orElseThrow(() -> new InvalidCodeException("Invalid or expired reset code"));
 
         assertAccountNotPendingDeletion(user);
@@ -364,6 +362,20 @@ public class UserService {
 
     private String normalizeUsername(String username) {
         return username == null ? "" : username.trim();
+    }
+
+    private Optional<User> findByIdentifier(String identifier) {
+        String normalized = identifier == null ? "" : identifier.trim();
+        if (normalized.isEmpty()) {
+            return Optional.empty();
+        }
+
+        if (normalized.contains("@")) {
+            return userRepository.findFirstByEmailIgnoreCase(normalizeEmail(normalized));
+        }
+
+        return userRepository.findFirstByUsernameIgnoreCase(normalized)
+                .or(() -> userRepository.findFirstByEmailIgnoreCase(normalizeEmail(normalized)));
     }
 
     private void throwRegistrationConflictForEmail(User existingUser) {
