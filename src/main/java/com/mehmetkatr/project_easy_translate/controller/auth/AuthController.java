@@ -80,7 +80,7 @@ public class AuthController {
 
     @PostMapping("/social/google")
     public ResponseEntity<AuthResponse> socialGoogleLogin(@Valid @RequestBody GoogleTokenLoginRequest request) {
-        AuthResponse response = userService.loginWithGoogleIdToken(request.getIdToken());
+        AuthResponse response = userService.loginWithGoogleIdToken(request.getIdToken(), request.getPreferredUsername());
         return ResponseEntity.ok(response);
     }
 

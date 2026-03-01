@@ -167,8 +167,24 @@ public class UserService {
 
     @Transactional
     public AuthResponse loginWithGoogleIdToken(String idToken) {
+        return loginWithGoogleIdToken(idToken, null);
+    }
+
+    @Transactional
+    public AuthResponse loginWithGoogleIdToken(String idToken, String preferredUsername) {
         GoogleTokenVerifierService.VerifiedGoogleUser googleUser = googleTokenVerifierService.verifyIdToken(idToken);
-        return socialLogin(googleUser.email(), googleUser.username());
+        String normalizedEmail = normalizeEmail(googleUser.email());
+        Optional<User> existingUser = userRepository.findFirstByEmailIgnoreCase(normalizedEmail);
+        if (existingUser.isPresent()) {
+            return socialLogin(googleUser.email(), googleUser.username());
+        }
+
+        String requestedUsername = normalizeUsername(preferredUsername);
+        if (requestedUsername.isBlank()) {
+            throw new ResourceConflictException("GOOGLE_USERNAME_REQUIRED", "Choose a username to complete Google sign-up");
+        }
+
+        return socialLogin(googleUser.email(), requestedUsername);
     }
 
     @Transactional
