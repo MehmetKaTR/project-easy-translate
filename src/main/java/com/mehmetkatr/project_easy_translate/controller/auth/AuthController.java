@@ -1,11 +1,6 @@
 package com.mehmetkatr.project_easy_translate.controller.auth;
 
-import com.mehmetkatr.project_easy_translate.dto.auth.AccountDeletionResponse;
-import com.mehmetkatr.project_easy_translate.dto.auth.AuthResponse;
-import com.mehmetkatr.project_easy_translate.dto.auth.GoogleTokenLoginRequest;
-import com.mehmetkatr.project_easy_translate.dto.auth.LoginRequest;
-import com.mehmetkatr.project_easy_translate.dto.auth.RegisterRequest;
-import com.mehmetkatr.project_easy_translate.dto.auth.SocialLoginRequest;
+import com.mehmetkatr.project_easy_translate.dto.auth.*;
 import com.mehmetkatr.project_easy_translate.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,11 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -27,9 +18,58 @@ public class AuthController {
     private final UserService userService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        AuthResponse response = userService.register(request.getUsername(), request.getEmail(), request.getPassword());
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    public ResponseEntity<GenericMessageResponse> register(@Valid @RequestBody RegisterRequest request) {
+        userService.register(request.getUsername(), request.getEmail(), request.getPassword());
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                GenericMessageResponse.builder()
+                        .code("VERIFICATION_REQUIRED")
+                        .message("Registration successful. Please verify your email with the code sent to your inbox.")
+                        .build()
+        );
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<GenericMessageResponse> verifyEmail(@Valid @RequestBody EmailVerificationRequest request) {
+        userService.verifyEmail(request.getEmail(), request.getCode());
+        return ResponseEntity.ok(
+                GenericMessageResponse.builder()
+                        .code("EMAIL_VERIFIED")
+                        .message("Email verified successfully. You can now login.")
+                        .build()
+        );
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<GenericMessageResponse> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        userService.resendVerification(request.getEmail());
+        return ResponseEntity.ok(
+                GenericMessageResponse.builder()
+                        .code("VERIFICATION_SENT")
+                        .message("If the email exists and is not verified, a new verification code has been sent.")
+                        .build()
+        );
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<GenericMessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        userService.requestPasswordReset(request.getEmail());
+        return ResponseEntity.ok(
+                GenericMessageResponse.builder()
+                        .code("RESET_SENT")
+                        .message("If the email exists, a password reset code has been sent.")
+                        .build()
+        );
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<GenericMessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        userService.resetPassword(request.getEmail(), request.getCode(), request.getNewPassword());
+        return ResponseEntity.ok(
+                GenericMessageResponse.builder()
+                        .code("PASSWORD_RESET_SUCCESS")
+                        .message("Password reset successful. You can now login.")
+                        .build()
+        );
     }
 
     @PostMapping("/login")

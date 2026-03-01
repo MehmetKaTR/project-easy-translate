@@ -15,4 +15,5 @@ public class AuthResponse {
     private String plan;
     private String preferredLanguage;
     private String themePreference;
+    private Boolean emailVerified;
 }
