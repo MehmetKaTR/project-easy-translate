@@ -22,6 +22,23 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<Map<String, Object>> handleEmailNotVerified(EmailNotVerifiedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "code", "EMAIL_NOT_VERIFIED",
+                "error", exception.getMessage(),
+                "email", exception.getEmail()
+        ));
+    }
+
+    @ExceptionHandler(InvalidCodeException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidCode(InvalidCodeException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "code", "INVALID_OR_EXPIRED_CODE",
+                "error", exception.getMessage()
+        ));
+    }
+
     @ExceptionHandler(ResourceConflictException.class)
     public ResponseEntity<Map<String, Object>> handleResourceConflict(ResourceConflictException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(

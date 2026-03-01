@@ -7,6 +7,8 @@ import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import com.mehmetkatr.project_easy_translate.exception.AccountPendingDeletionException;
 import com.mehmetkatr.project_easy_translate.exception.AuthenticationFailedException;
+import com.mehmetkatr.project_easy_translate.exception.EmailNotVerifiedException;
+import com.mehmetkatr.project_easy_translate.exception.InvalidCodeException;
 import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
@@ -20,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -30,9 +33,16 @@ public class UserService {
     private final WordListRepository wordListRepository;
     private final PasswordEncoder passwordEncoder;
     private final GoogleTokenVerifierService googleTokenVerifierService;
+    private final EmailDeliveryService emailDeliveryService;
 
     @Value("${app.account.deletion.grace-days:7}")
     private int accountDeletionGraceDays;
+
+    @Value("${app.auth.email-verification-code-ttl-minutes:15}")
+    private int emailVerificationCodeTtlMinutes;
+
+    @Value("${app.auth.password-reset-code-ttl-minutes:15}")
+    private int passwordResetCodeTtlMinutes;
 
     public List<User> findAll() {
         return userRepository.findAll();
@@ -67,6 +77,7 @@ public class UserService {
                 .username(normalizedUsername)
                 .email(normalizedEmail)
                 .passwordHash(passwordEncoder.encode(rawPassword))
+                .emailVerified(false)
                 .subscriptionLevel(User.SubscriptionLevel.FREE)
                 .tokenBalance(0)
                 .pendingDeletion(false)
@@ -76,6 +87,10 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
         ensureDefaultWordList(savedUser);
+
+        issueEmailVerificationCode(savedUser);
+        emailDeliveryService.sendVerificationCode(savedUser.getEmail(), savedUser.getEmailVerificationCode());
+
         return savedUser;
     }
 
@@ -90,6 +105,12 @@ public class UserService {
         if (existingUser.isPresent()) {
             User user = existingUser.get();
             assertAccountNotPendingDeletion(user);
+            if (!user.isEmailVerified()) {
+                user.setEmailVerified(true);
+                user.setEmailVerificationCode(null);
+                user.setEmailVerificationExpiresAt(null);
+                userRepository.save(user);
+            }
             return user;
         }
 
@@ -100,6 +121,7 @@ public class UserService {
                 .username(normalizedUsername)
                 .email(normalizedEmail)
                 .passwordHash("")
+                .emailVerified(true)
                 .subscriptionLevel(User.SubscriptionLevel.FREE)
                 .tokenBalance(0)
                 .pendingDeletion(false)
@@ -113,10 +135,8 @@ public class UserService {
     }
 
     @Transactional
-    public AuthResponse register(String username, String email, String rawPassword) {
-        User savedUser = registerUser(username, email, rawPassword);
-        String token = tokenService.generateToken(savedUser.getUsername(), "ROLE_USER");
-        return buildAuthResponse(savedUser, token);
+    public void register(String username, String email, String rawPassword) {
+        registerUser(username, email, rawPassword);
     }
 
     public AuthResponse login(String username, String rawPassword) {
@@ -129,6 +149,10 @@ public class UserService {
 
         if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
             throw new AuthenticationFailedException("Invalid username or password");
+        }
+
+        if (!user.isEmailVerified()) {
+            throw new EmailNotVerifiedException("Email is not verified. Please verify your email first.", user.getEmail());
         }
 
         String token = tokenService.generateToken(user.getUsername(), "ROLE_USER");
@@ -146,6 +170,99 @@ public class UserService {
     public AuthResponse loginWithGoogleIdToken(String idToken) {
         GoogleTokenVerifierService.VerifiedGoogleUser googleUser = googleTokenVerifierService.verifyIdToken(idToken);
         return socialLogin(googleUser.email(), googleUser.username());
+    }
+
+    @Transactional
+    public void verifyEmail(String email, String code) {
+        String normalizedEmail = normalizeEmail(email);
+        User user = userRepository.findFirstByEmailIgnoreCase(normalizedEmail)
+                .orElseThrow(() -> new InvalidCodeException("Invalid or expired verification code"));
+
+        assertAccountNotPendingDeletion(user);
+
+        if (user.isEmailVerified()) {
+            return;
+        }
+
+        if (user.getEmailVerificationCode() == null || user.getEmailVerificationExpiresAt() == null) {
+            throw new InvalidCodeException("Invalid or expired verification code");
+        }
+
+        String normalizedCode = normalizeCode(code);
+        if (!normalizedCode.equals(user.getEmailVerificationCode())) {
+            throw new InvalidCodeException("Invalid or expired verification code");
+        }
+
+        if (user.getEmailVerificationExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new InvalidCodeException("Invalid or expired verification code");
+        }
+
+        user.setEmailVerified(true);
+        user.setEmailVerificationCode(null);
+        user.setEmailVerificationExpiresAt(null);
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void resendVerification(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        Optional<User> userOpt = userRepository.findFirstByEmailIgnoreCase(normalizedEmail);
+        if (userOpt.isEmpty()) {
+            return;
+        }
+
+        User user = userOpt.get();
+        assertAccountNotPendingDeletion(user);
+
+        if (user.isEmailVerified()) {
+            return;
+        }
+
+        issueEmailVerificationCode(user);
+        emailDeliveryService.sendVerificationCode(user.getEmail(), user.getEmailVerificationCode());
+    }
+
+    @Transactional
+    public void requestPasswordReset(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        Optional<User> userOpt = userRepository.findFirstByEmailIgnoreCase(normalizedEmail);
+        if (userOpt.isEmpty()) {
+            return;
+        }
+
+        User user = userOpt.get();
+        assertAccountNotPendingDeletion(user);
+
+        issuePasswordResetCode(user);
+        emailDeliveryService.sendPasswordResetCode(user.getEmail(), user.getPasswordResetCode());
+    }
+
+    @Transactional
+    public void resetPassword(String email, String code, String newPassword) {
+        String normalizedEmail = normalizeEmail(email);
+        User user = userRepository.findFirstByEmailIgnoreCase(normalizedEmail)
+                .orElseThrow(() -> new InvalidCodeException("Invalid or expired reset code"));
+
+        assertAccountNotPendingDeletion(user);
+
+        if (user.getPasswordResetCode() == null || user.getPasswordResetExpiresAt() == null) {
+            throw new InvalidCodeException("Invalid or expired reset code");
+        }
+
+        String normalizedCode = normalizeCode(code);
+        if (!normalizedCode.equals(user.getPasswordResetCode())) {
+            throw new InvalidCodeException("Invalid or expired reset code");
+        }
+
+        if (user.getPasswordResetExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new InvalidCodeException("Invalid or expired reset code");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setPasswordResetCode(null);
+        user.setPasswordResetExpiresAt(null);
+        user.setEmailVerified(true);
+        userRepository.save(user);
     }
 
     @Transactional
@@ -218,6 +335,27 @@ public class UserService {
                 .hexColorCode("#EEEEEE")
                 .build();
         wordListRepository.save(generalList);
+    }
+
+    private void issueEmailVerificationCode(User user) {
+        user.setEmailVerificationCode(generateCode());
+        user.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(Math.max(5, emailVerificationCodeTtlMinutes)));
+        userRepository.save(user);
+    }
+
+    private void issuePasswordResetCode(User user) {
+        user.setPasswordResetCode(generateCode());
+        user.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(Math.max(5, passwordResetCodeTtlMinutes)));
+        userRepository.save(user);
+    }
+
+    private String generateCode() {
+        int code = ThreadLocalRandom.current().nextInt(100000, 1000000);
+        return String.valueOf(code);
+    }
+
+    private String normalizeCode(String code) {
+        return code == null ? "" : code.trim();
     }
 
     private String normalizeEmail(String email) {
@@ -294,6 +432,7 @@ public class UserService {
                 .plan(user.getSubscriptionLevel().name())
                 .preferredLanguage(user.getPreferredLanguage().name())
                 .themePreference(user.getThemePreference().name())
+                .emailVerified(user.isEmailVerified())
                 .build();
     }
 }

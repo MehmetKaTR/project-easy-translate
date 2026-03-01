@@ -21,7 +21,8 @@ import java.util.List;
         indexes = {
                 @Index(name = "idx_users_username", columnList = "username"),
                 @Index(name = "idx_users_email", columnList = "email"),
-                @Index(name = "idx_users_pending_deletion", columnList = "pending_deletion,deletion_scheduled_at")
+                @Index(name = "idx_users_pending_deletion", columnList = "pending_deletion,deletion_scheduled_at"),
+                @Index(name = "idx_users_email_verified", columnList = "email_verified")
         }
 )
 public class User extends BaseEntity {
@@ -43,6 +44,22 @@ public class User extends BaseEntity {
     @NotNull
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
+
+    @Builder.Default
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified = false;
+
+    @Column(name = "email_verification_code", length = 16)
+    private String emailVerificationCode;
+
+    @Column(name = "email_verification_expires_at")
+    private LocalDateTime emailVerificationExpiresAt;
+
+    @Column(name = "password_reset_code", length = 16)
+    private String passwordResetCode;
+
+    @Column(name = "password_reset_expires_at")
+    private LocalDateTime passwordResetExpiresAt;
 
     @NotNull
     @Enumerated(EnumType.STRING)
