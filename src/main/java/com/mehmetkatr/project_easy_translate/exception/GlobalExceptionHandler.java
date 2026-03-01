@@ -39,6 +39,15 @@ public class GlobalExceptionHandler {
         ));
     }
 
+
+    @ExceptionHandler(MailDeliveryException.class)
+    public ResponseEntity<Map<String, Object>> handleMailDelivery(MailDeliveryException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "code", "MAIL_DELIVERY_FAILED",
+                "error", exception.getMessage()
+        ));
+    }
+
     @ExceptionHandler(ResourceConflictException.class)
     public ResponseEntity<Map<String, Object>> handleResourceConflict(ResourceConflictException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
