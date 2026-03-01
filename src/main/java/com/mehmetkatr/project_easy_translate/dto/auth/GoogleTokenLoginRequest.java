@@ -10,4 +10,6 @@ public class GoogleTokenLoginRequest {
 
     @NotBlank
     private String idToken;
+
+    private String preferredUsername;
 }
