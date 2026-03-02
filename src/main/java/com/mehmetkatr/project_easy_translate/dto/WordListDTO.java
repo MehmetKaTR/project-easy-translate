@@ -4,6 +4,7 @@ import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import lombok.Getter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -19,8 +20,7 @@ public class WordListDTO {
         this.id = wordList.getId();
         this.name = wordList.getName();
         this.color = wordList.getHexColorCode();
-        this.words = wordList.getWords();
+        this.words = new ArrayList<>(wordList.getWords());
     }
 }
-
 

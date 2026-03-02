@@ -12,7 +12,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @RestController
@@ -35,13 +37,13 @@ public class WordController {
     @Transactional
     public ResponseEntity<List<WordDTO>> getAllWordsByAll(@RequestParam(required = false) Long userId) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-        User user = new User();
-        user.setId(authenticatedUserId);
-
-        Optional<WordList> wordListOpt = wordListService.getWordListsByUserAndName(user, "All");
+        Optional<WordList> wordListOpt = resolveAllList(authenticatedUserId);
         if (wordListOpt.isEmpty()) return ResponseEntity.notFound().build();
 
-        List<WordDTO> dtoList = wordListOpt.get().getWords().stream().map(WordDTO::new).toList();
+        List<WordDTO> dtoList = wordListOpt.get().getWords().stream()
+                .sorted(Comparator.comparing(Word::getId))
+                .map(WordDTO::new)
+                .toList();
         return ResponseEntity.ok(dtoList);
     }
 
@@ -55,7 +57,10 @@ public class WordController {
         Optional<WordList> wordListOpt = wordListService.getWordListsByUserAndWordListId(user, wordListId);
         if (wordListOpt.isEmpty()) return ResponseEntity.notFound().build();
 
-        List<WordDTO> dtoList = wordListOpt.get().getWords().stream().map(WordDTO::new).toList();
+        List<WordDTO> dtoList = wordListOpt.get().getWords().stream()
+                .sorted(Comparator.comparing(Word::getId))
+                .map(WordDTO::new)
+                .toList();
         return ResponseEntity.ok(dtoList);
     }
 
@@ -69,19 +74,26 @@ public class WordController {
     @PutMapping("/add")
     public ResponseEntity<WordDTO> addWord(@RequestParam(required = false) Long userId, @RequestBody WordDTO wordDTO) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-        User user = new User();
-        user.setId(authenticatedUserId);
-
-        Optional<WordList> allList = wordListService.getWordListsByUserAndName(user, "All");
+        Optional<WordList> allList = resolveAllList(authenticatedUserId);
         if (allList.isEmpty()) return ResponseEntity.badRequest().build();
 
-        Word word = Word.builder()
-                .word(wordDTO.getWord())
-                .translated(wordDTO.getTranslated())
-                .languageCode(wordDTO.getLanguageCode())
-                .wordList(allList.get())
-                .starred(Boolean.TRUE.equals(wordDTO.getStarred()))
-                .build();
+        Word word = findExistingWordByContent(authenticatedUserId, wordDTO)
+                .orElseGet(() -> {
+                    User user = new User();
+                    user.setId(authenticatedUserId);
+                    return Word.builder()
+                            .word(wordDTO.getWord())
+                            .translated(wordDTO.getTranslated())
+                            .languageCode(wordDTO.getLanguageCode())
+                            .user(user)
+                            .starred(Boolean.TRUE.equals(wordDTO.getStarred()))
+                            .build();
+                });
+
+        if (wordDTO.getStarred() != null) {
+            word.setStarred(wordDTO.getStarred());
+        }
+        word.getWordLists().add(allList.get());
 
         Word saved = wordService.addWord(word);
         return ResponseEntity.ok(new WordDTO(saved));
@@ -99,30 +111,40 @@ public class WordController {
 
         Optional<WordList> targetListOpt = wordListService.getWordListsByUserAndWordListId(user, wordListId);
         if (targetListOpt.isEmpty()) return ResponseEntity.notFound().build();
+        Optional<WordList> allListOpt = resolveAllList(authenticatedUserId);
+        if (allListOpt.isEmpty()) return ResponseEntity.badRequest().build();
 
-        Word newWord = Word.builder()
-                .word(wordDTO.getWord())
-                .translated(wordDTO.getTranslated())
-                .languageCode(wordDTO.getLanguageCode())
-                .wordList(targetListOpt.get())
-                .starred(Boolean.TRUE.equals(wordDTO.getStarred()))
-                .build();
+        Optional<Word> existingById = Optional.ofNullable(wordDTO.getId())
+                .flatMap(id -> wordService.getAllWordsByUser(authenticatedUserId).stream()
+                        .filter(item -> item.getId().equals(id))
+                        .findFirst());
+        Word word = existingById.or(() -> findExistingWordByContent(authenticatedUserId, wordDTO))
+                .orElseGet(() -> {
+                    Word created = new Word();
+                    created.setWord(wordDTO.getWord());
+                    created.setTranslated(wordDTO.getTranslated());
+                    created.setLanguageCode(wordDTO.getLanguageCode());
+                    created.setStarred(Boolean.TRUE.equals(wordDTO.getStarred()));
+                    created.setUser(user);
+                    return created;
+                });
 
-        Word saved = wordService.addWord(newWord);
+        if (wordDTO.getStarred() != null) {
+            word.setStarred(wordDTO.getStarred());
+        }
+
+        // Dogru model: kelime tek kayit, All + hedef klasor iliskisi tutulur.
+        word.getWordLists().add(allListOpt.get());
+        word.getWordLists().add(targetListOpt.get());
+
+        Word saved = wordService.addWord(word);
         return ResponseEntity.ok(new WordDTO(saved));
     }
 
     @DeleteMapping("/delete")
     public ResponseEntity<WordDTO> deleteWord(@RequestParam(required = false) Long userId, @RequestParam Long wordId) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-        User user = new User();
-        user.setId(authenticatedUserId);
-
-        List<WordList> wordLists = wordListService.getWordListsByUser(user);
-        if (wordLists == null || wordLists.isEmpty()) return ResponseEntity.badRequest().build();
-
-        Optional<Word> wordOpt = wordLists.stream()
-                .flatMap(wl -> wordService.getWordsByWordList(wl).stream())
+        Optional<Word> wordOpt = wordService.getAllWordsByUser(authenticatedUserId).stream()
                 .filter(w -> w.getId().equals(wordId))
                 .findFirst();
 
@@ -141,14 +163,7 @@ public class WordController {
             @RequestBody WordDTO wordDTO
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-        User user = new User();
-        user.setId(authenticatedUserId);
-
-        List<WordList> wordLists = wordListService.getWordListsByUser(user);
-        if (wordLists == null || wordLists.isEmpty()) return ResponseEntity.badRequest().build();
-
-        Optional<Word> wordOpt = wordLists.stream()
-                .flatMap(wl -> wordService.getWordsByWordList(wl).stream())
+        Optional<Word> wordOpt = wordService.getAllWordsByUser(authenticatedUserId).stream()
                 .filter(w -> w.getId().equals(wordId))
                 .findFirst();
 
@@ -159,7 +174,7 @@ public class WordController {
         if (wordDTO.getWord() != null) word.setWord(wordDTO.getWord());
         if (wordDTO.getTranslated() != null) word.setTranslated(wordDTO.getTranslated());
         if (wordDTO.getLanguageCode() != null) word.setLanguageCode(wordDTO.getLanguageCode());
-        if (wordDTO.getStarred() != null) word.setStarred(wordDTO.getStarred()); // KRITIK
+        if (wordDTO.getStarred() != null) word.setStarred(wordDTO.getStarred());
 
         Word updated = wordService.addWord(word);
         return ResponseEntity.ok(new WordDTO(updated));
@@ -172,14 +187,7 @@ public class WordController {
             @RequestParam boolean starred
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-        User user = new User();
-        user.setId(authenticatedUserId);
-
-        List<WordList> wordLists = wordListService.getWordListsByUser(user);
-        if (wordLists == null || wordLists.isEmpty()) return ResponseEntity.badRequest().build();
-
-        Optional<Word> wordOpt = wordLists.stream()
-                .flatMap(wl -> wordService.getWordsByWordList(wl).stream())
+        Optional<Word> wordOpt = wordService.getAllWordsByUser(authenticatedUserId).stream()
                 .filter(w -> w.getId().equals(wordId))
                 .findFirst();
 
@@ -190,5 +198,30 @@ public class WordController {
 
         Word updated = wordService.addWord(word);
         return ResponseEntity.ok(new WordDTO(updated));
+    }
+
+    private Optional<WordList> resolveAllList(Long authenticatedUserId) {
+        User user = new User();
+        user.setId(authenticatedUserId);
+        return wordListService.getWordListsByUserAndName(user, "All");
+    }
+
+    private Optional<Word> findExistingWordByContent(Long userId, WordDTO dto) {
+        if (dto == null || isBlank(dto.getWord()) || isBlank(dto.getTranslated()) || isBlank(dto.getLanguageCode())) {
+            return Optional.empty();
+        }
+        return wordService.getAllWordsByUser(userId).stream()
+                .filter(item -> normalize(item.getWord()).equals(normalize(dto.getWord())))
+                .filter(item -> normalize(item.getTranslated()).equals(normalize(dto.getTranslated())))
+                .filter(item -> normalize(item.getLanguageCode()).equals(normalize(dto.getLanguageCode())))
+                .findFirst();
+    }
+
+    private String normalize(String value) {
+        return String.valueOf(value == null ? "" : value).trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }

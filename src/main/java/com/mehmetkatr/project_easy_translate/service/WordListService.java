@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -110,11 +109,10 @@ public class WordListService {
             Map<Long, Word> userWordsById = wordRepository.findAllByUserId(userId).stream()
                     .collect(Collectors.toMap(Word::getId, word -> word));
 
-            List<Word> selectedWords = new ArrayList<>();
+            Set<Word> selectedWords = new LinkedHashSet<>();
             for (Long wordId : dedupedIds) {
                 Word word = userWordsById.get(wordId);
                 if (word != null) {
-                    word.setWordList(existing);
                     selectedWords.add(word);
                 }
             }
@@ -133,11 +131,9 @@ public class WordListService {
         WordList wordList = wordListRepository.findById(wordListId)
                 .orElseThrow(() -> new IllegalArgumentException("WordList not found with id: " + wordListId));
 
-        List<Word> existingWords = wordList.getWords();
+        Set<Word> existingWords = wordList.getWords();
 
-        List<Word> wordsToAdd = wordRepository.findAllById(selectedWordIds).stream()
-                .filter(word -> !existingWords.contains(word))
-                .toList();
+        List<Word> wordsToAdd = wordRepository.findAllById(selectedWordIds);
         existingWords.addAll(wordsToAdd);
 
         existingWords.removeIf(word -> !selectedWordIds.contains(word.getId()));
@@ -154,9 +150,7 @@ public class WordListService {
 
     public void addWordsToWordList(Long wordListId, List<Long> wordIds) {
         WordList wordList = getWordListById(wordListId);
-        List<Word> wordsToAdd = wordRepository.findAllById(wordIds).stream()
-                .filter(word -> wordList.getWords().stream().noneMatch(w -> w.getId().equals(word.getId())))
-                .toList();
+        List<Word> wordsToAdd = wordRepository.findAllById(wordIds);
         wordList.getWords().addAll(wordsToAdd);
         wordListRepository.save(wordList);
     }

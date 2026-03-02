@@ -1,6 +1,7 @@
 package com.mehmetkatr.project_easy_translate.dto;
 
 import com.mehmetkatr.project_easy_translate.entity.Word;
+import com.mehmetkatr.project_easy_translate.entity.WordList;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -21,7 +22,7 @@ public class WordDTO {
         this.word = word.getWord();
         this.translated = word.getTranslated();
         this.languageCode = word.getLanguageCode();
-        this.wordListId = word.getWordList() != null ? word.getWordList().getId() : null;
+        this.wordListId = word.getWordLists().stream().map(WordList::getId).findFirst().orElse(null);
         this.starred = word.isStarred();
     }
 }

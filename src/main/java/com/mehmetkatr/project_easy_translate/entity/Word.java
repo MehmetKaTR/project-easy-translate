@@ -6,6 +6,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Builder
@@ -15,7 +18,7 @@ import lombok.*;
 @Table(
         name = "words",
         indexes = {
-                @Index(name = "idx_words_wordlist_id", columnList = "wordlist_id"),
+                @Index(name = "idx_words_user_id", columnList = "user_id"),
                 @Index(name = "idx_words_starred", columnList = "starred")
         }
 )
@@ -30,9 +33,9 @@ public class Word extends BaseEntity {
     private String word;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "wordlist_id")
+    @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore
-    private WordList wordList;
+    private User user;
 
     @NotNull
     private String languageCode;
@@ -44,4 +47,15 @@ public class Word extends BaseEntity {
     @Builder.Default
     @Column(nullable = false)
     private boolean starred = false;
+
+    @Builder.Default
+    @ManyToMany
+    @JoinTable(
+            name = "wordlist_words",
+            joinColumns = @JoinColumn(name = "word_id"),
+            inverseJoinColumns = @JoinColumn(name = "wordlist_id"),
+            uniqueConstraints = @UniqueConstraint(name = "uk_wordlist_words", columnNames = {"word_id", "wordlist_id"})
+    )
+    @JsonIgnore
+    private Set<WordList> wordLists = new LinkedHashSet<>();
 }
