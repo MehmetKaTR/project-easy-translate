@@ -5,7 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -38,7 +39,8 @@ public class WordList extends BaseEntity {
     @Column(name = "hex_color_code", length = 7, nullable = false)
     private String hexColorCode;
 
-    @OneToMany(mappedBy = "wordList", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Word> words;
+    @Builder.Default
+    @ManyToMany(mappedBy = "wordLists")
+    private Set<Word> words = new LinkedHashSet<>();
 
 }
