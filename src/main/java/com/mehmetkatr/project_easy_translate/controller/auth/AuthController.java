@@ -97,6 +97,20 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/account/deletion-status")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AccountDeletionResponse> getDeletionStatus(Authentication authentication) {
+        AccountDeletionResponse response = userService.getAccountDeletionStatus(authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/account/cancel-deletion")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AccountDeletionResponse> cancelDeletion(Authentication authentication) {
+        AccountDeletionResponse response = userService.cancelAccountDeletion(authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/onboarding/complete")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<GenericMessageResponse> completeOnboarding(Authentication authentication) {
