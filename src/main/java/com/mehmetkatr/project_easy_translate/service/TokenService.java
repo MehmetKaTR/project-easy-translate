@@ -3,14 +3,17 @@ package com.mehmetkatr.project_easy_translate.service;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TokenService {
 
     @Value("${jwt.secret}")
@@ -20,24 +23,22 @@ public class TokenService {
     private Long jwtExpirationMs;
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
-    // JWT oluştur
     public String generateToken(String username, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
         return Jwts.builder()
                 .setSubject(username)
-                .claim("role", role) // kurumsal için role ekliyoruz
+                .claim("role", role)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    // JWT doğrula
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder()
@@ -46,14 +47,13 @@ public class TokenService {
                     .parseClaimsJws(token);
             return true;
         } catch (ExpiredJwtException e) {
-            System.out.println("Token expired");
+            log.debug("JWT token expired");
         } catch (JwtException e) {
-            System.out.println("Token invalid");
+            log.debug("JWT token invalid");
         }
         return false;
     }
 
-    // Token'dan username çek
     public String getUsernameFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
@@ -63,7 +63,6 @@ public class TokenService {
         return claims.getSubject();
     }
 
-    // Token'dan role çek
     public String getRoleFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())

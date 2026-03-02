@@ -29,8 +29,9 @@ public class StoryController {
     }
 
     @GetMapping("/all")
-    public ResponseEntity<List<StoryDTO>> findAll() {
-        List<StoryDTO> result = storyService.findAll().stream().map(StoryDTO::new).toList();
+    public ResponseEntity<List<StoryDTO>> findAll(@RequestParam(required = false) Long userId) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
+        List<StoryDTO> result = storyService.findByUserId(authenticatedUserId).stream().map(StoryDTO::new).toList();
         return ResponseEntity.ok(result);
     }
 

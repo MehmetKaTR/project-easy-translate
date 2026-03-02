@@ -1,13 +1,11 @@
 package com.mehmetkatr.project_easy_translate.controller;
 
 import com.mehmetkatr.project_easy_translate.dto.WordListDTO;
-import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.entity.User;
-
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
+import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.service.WordListService;
-
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -51,7 +49,7 @@ public class WordListController {
         newList.setHexColorCode(dto.getColor());
         newList.setWords(new ArrayList<>());
 
-        WordList saved = wordListService.saveWordList(newList);
+        WordList saved = wordListService.createWordList(newList);
 
         return ResponseEntity.ok(new WordListDTO(saved));
     }
@@ -67,22 +65,22 @@ public class WordListController {
         User user = new User();
         user.setId(authenticatedUserId);
 
-        WordList wordList = new WordList();
-        wordList.setId(wordListId);
-        wordList.setUser(user);
-        wordList.setName(dto.getName());
-        wordList.setHexColorCode(dto.getColor());
-
-        List<Word> updatedWords = new ArrayList<>();
-
-        for (Word w : dto.getWords()) {
-            w.setWordList(wordList);
-            updatedWords.add(w);
+        Optional<WordList> existingOpt = wordListService.getWordListsByUserAndWordListId(user, wordListId);
+        if (existingOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
         }
 
-        wordList.setWords(updatedWords);
+        List<Long> requestedWordIds = dto.getWords() == null
+                ? null
+                : dto.getWords().stream().map(Word::getId).toList();
 
-        WordList saved = wordListService.saveWordList(wordList);
+        WordList saved = wordListService.updateWordListOwnedByUser(
+                authenticatedUserId,
+                existingOpt.get(),
+                dto.getName(),
+                dto.getColor(),
+                requestedWordIds
+        );
 
         return ResponseEntity.ok(new WordListDTO(saved));
     }
@@ -94,11 +92,9 @@ public class WordListController {
             @RequestParam Long wordListId) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
 
-        // Kullanıcıyı oluştur / doğrula
         User user = new User();
         user.setId(authenticatedUserId);
 
-        // Kullanıcının WordList'ini al
         Optional<WordList> wordListOpt = wordListService.getWordListsByUserAndWordListId(user, wordListId);
 
         if (wordListOpt.isEmpty()) {
@@ -106,11 +102,8 @@ public class WordListController {
         }
 
         WordList wordList = wordListOpt.get();
-
-        // WordList'i sil
         wordListService.deleteWordList(wordList.getId());
 
-        // Silinen WordList'i DTO ile dön
         return ResponseEntity.ok(new WordListDTO(wordList));
     }
 
