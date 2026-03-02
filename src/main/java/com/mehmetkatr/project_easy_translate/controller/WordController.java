@@ -1,3 +1,4 @@
+
 package com.mehmetkatr.project_easy_translate.controller;
 
 import com.mehmetkatr.project_easy_translate.dto.WordDTO;
@@ -20,6 +21,8 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/words")
 @RequiredArgsConstructor
+@Transactional
+
 public class WordController {
 
     private final WordService wordService;
