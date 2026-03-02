@@ -139,6 +139,8 @@ public class UserService {
     }
 
     public AuthResponse login(String username, String rawPassword) {
+        purgeExpiredPendingDeletions();
+
         String normalizedUsername = normalizeUsername(username);
 
         User user = userRepository.findFirstByUsernameIgnoreCase(normalizedUsername)
@@ -172,6 +174,8 @@ public class UserService {
 
     @Transactional
     public AuthResponse loginWithGoogleIdToken(String idToken, String preferredUsername) {
+        purgeExpiredPendingDeletions();
+
         GoogleTokenVerifierService.VerifiedGoogleUser googleUser = googleTokenVerifierService.verifyIdToken(idToken);
         String normalizedEmail = normalizeEmail(googleUser.email());
         Optional<User> existingUser = userRepository.findFirstByEmailIgnoreCase(normalizedEmail);
@@ -292,6 +296,7 @@ public class UserService {
                     .message("Your account deletion request is already active")
                     .scheduledDeletionAt(user.getDeletionScheduledAt().toString())
                     .graceDays(Math.max(1, accountDeletionGraceDays))
+                    .pendingDeletion(true)
                     .build();
         }
 
@@ -302,9 +307,67 @@ public class UserService {
 
         return AccountDeletionResponse.builder()
                 .status("PENDING_DELETION")
-                .message("Your account will be permanently deleted after the grace period")
+                .message("Deletion request received. Your account will be deleted after the grace period.")
                 .scheduledDeletionAt(scheduledAt.toString())
                 .graceDays(Math.max(1, accountDeletionGraceDays))
+                .pendingDeletion(true)
+                .build();
+    }
+
+    @Transactional
+    public AccountDeletionResponse cancelAccountDeletion(String authenticatedUsername) {
+        User user = userRepository.findByUsername(authenticatedUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found"));
+
+        if (!user.isPendingDeletion()) {
+            return AccountDeletionResponse.builder()
+                    .status("ACTIVE")
+                    .message("No active deletion request found")
+                    .scheduledDeletionAt(null)
+                    .graceDays(Math.max(1, accountDeletionGraceDays))
+                    .pendingDeletion(false)
+                    .build();
+        }
+
+        user.setPendingDeletion(false);
+        user.setDeletionRequestedAt(null);
+        user.setDeletionScheduledAt(null);
+        userRepository.save(user);
+
+        return AccountDeletionResponse.builder()
+                .status("ACTIVE")
+                .message("Deletion request canceled")
+                .scheduledDeletionAt(null)
+                .graceDays(Math.max(1, accountDeletionGraceDays))
+                .pendingDeletion(false)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public AccountDeletionResponse getAccountDeletionStatus(String authenticatedUsername) {
+        User user = userRepository.findByUsername(authenticatedUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found"));
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime scheduledAt = user.getDeletionScheduledAt();
+        boolean pendingActive = user.isPendingDeletion() && scheduledAt != null && scheduledAt.isAfter(now);
+
+        if (!pendingActive) {
+            return AccountDeletionResponse.builder()
+                    .status("ACTIVE")
+                    .message("Account is active")
+                    .scheduledDeletionAt(null)
+                    .graceDays(Math.max(1, accountDeletionGraceDays))
+                    .pendingDeletion(false)
+                    .build();
+        }
+
+        return AccountDeletionResponse.builder()
+                .status("PENDING_DELETION")
+                .message("Deletion request is active")
+                .scheduledDeletionAt(scheduledAt.toString())
+                .graceDays(Math.max(1, accountDeletionGraceDays))
+                .pendingDeletion(true)
                 .build();
     }
 
@@ -450,18 +513,19 @@ public class UserService {
 
         LocalDateTime scheduledAt = user.getDeletionScheduledAt();
         if (scheduledAt == null) {
-            throw new AccountPendingDeletionException(
-                    "This account is pending deletion",
-                    LocalDateTime.now().plusDays(Math.max(1, accountDeletionGraceDays))
-            );
+            return;
         }
 
-        if (scheduledAt.isAfter(LocalDateTime.now())) {
-            throw new AccountPendingDeletionException(
-                    "This account is pending deletion. You can try again after the grace period",
-                    scheduledAt
-            );
+        LocalDateTime now = LocalDateTime.now();
+        if (scheduledAt.isAfter(now)) {
+            // Grace period is active: user can continue to use account until scheduled deletion time.
+            return;
         }
+
+        throw new AccountPendingDeletionException(
+                "Deletion grace period has expired. Account will be removed shortly",
+                scheduledAt
+        );
     }
 
     private User.PreferredLanguage parsePreferredLanguage(String value) {

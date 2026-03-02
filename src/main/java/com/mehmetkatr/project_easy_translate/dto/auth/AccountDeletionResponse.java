@@ -12,4 +12,5 @@ public class AccountDeletionResponse {
     private String message;
     private String scheduledDeletionAt;
     private Integer graceDays;
+    private Boolean pendingDeletion;
 }
