@@ -90,6 +90,10 @@ public class User extends BaseEntity {
     @Column(name = "theme_preference", nullable = false)
     private ThemePreference themePreference = ThemePreference.LIGHT;
 
+    @Builder.Default
+    @Column(name = "onboarding_completed", nullable = false)
+    private boolean onboardingCompleted = false;
+
     // ---------------- Relationships ----------------
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<WordList> wordLists;
