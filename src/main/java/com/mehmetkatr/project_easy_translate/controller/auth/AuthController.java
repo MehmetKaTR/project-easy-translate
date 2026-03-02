@@ -1,7 +1,9 @@
 package com.mehmetkatr.project_easy_translate.controller.auth;
 
 import com.mehmetkatr.project_easy_translate.dto.auth.*;
+import com.mehmetkatr.project_easy_translate.service.AuthRateLimitService;
 import com.mehmetkatr.project_easy_translate.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -10,15 +12,22 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final UserService userService;
+    private final AuthRateLimitService authRateLimitService;
 
     @PostMapping("/register")
-    public ResponseEntity<GenericMessageResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<GenericMessageResponse> register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        throttle(httpRequest, "register", 12, Duration.ofMinutes(5));
         userService.register(request.getUsername(), request.getEmail(), request.getPassword());
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 GenericMessageResponse.builder()
@@ -29,7 +38,11 @@ public class AuthController {
     }
 
     @PostMapping("/verify-email")
-    public ResponseEntity<GenericMessageResponse> verifyEmail(@Valid @RequestBody EmailVerificationRequest request) {
+    public ResponseEntity<GenericMessageResponse> verifyEmail(
+            @Valid @RequestBody EmailVerificationRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        throttle(httpRequest, "verify-email", 30, Duration.ofMinutes(5));
         userService.verifyEmail(request.getEmail(), request.getCode());
         return ResponseEntity.ok(
                 GenericMessageResponse.builder()
@@ -40,7 +53,11 @@ public class AuthController {
     }
 
     @PostMapping("/resend-verification")
-    public ResponseEntity<GenericMessageResponse> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+    public ResponseEntity<GenericMessageResponse> resendVerification(
+            @Valid @RequestBody ResendVerificationRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        throttle(httpRequest, "resend-verification", 10, Duration.ofMinutes(5));
         userService.resendVerification(request.getEmail());
         return ResponseEntity.ok(
                 GenericMessageResponse.builder()
@@ -51,7 +68,11 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<GenericMessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<GenericMessageResponse> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        throttle(httpRequest, "forgot-password", 10, Duration.ofMinutes(5));
         userService.requestPasswordReset(request.getEmail());
         return ResponseEntity.ok(
                 GenericMessageResponse.builder()
@@ -62,7 +83,11 @@ public class AuthController {
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<GenericMessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<GenericMessageResponse> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        throttle(httpRequest, "reset-password", 20, Duration.ofMinutes(5));
         userService.resetPassword(request.getEmail(), request.getCode(), request.getNewPassword());
         return ResponseEntity.ok(
                 GenericMessageResponse.builder()
@@ -73,19 +98,31 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        throttle(httpRequest, "login", 25, Duration.ofMinutes(5));
         AuthResponse response = userService.login(request.getUsername(), request.getPassword());
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/social/google")
-    public ResponseEntity<AuthResponse> socialGoogleLogin(@Valid @RequestBody GoogleTokenLoginRequest request) {
+    public ResponseEntity<AuthResponse> socialGoogleLogin(
+            @Valid @RequestBody GoogleTokenLoginRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        throttle(httpRequest, "social-google", 25, Duration.ofMinutes(5));
         AuthResponse response = userService.loginWithGoogleIdToken(request.getIdToken(), request.getPreferredUsername());
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/social/google/dev")
-    public ResponseEntity<AuthResponse> socialGoogleDevLogin(@Valid @RequestBody SocialLoginRequest request) {
+    public ResponseEntity<AuthResponse> socialGoogleDevLogin(
+            @Valid @RequestBody SocialLoginRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        throttle(httpRequest, "social-google-dev", 25, Duration.ofMinutes(5));
         AuthResponse response = userService.socialLogin(request.getEmail(), request.getUsername());
         return ResponseEntity.ok(response);
     }
@@ -121,5 +158,24 @@ public class AuthController {
                         .message("Onboarding marked as completed.")
                         .build()
         );
+    }
+
+    private void throttle(HttpServletRequest request, String action, int limit, Duration window) {
+        authRateLimitService.assertAllowed(action + ":" + resolveClientIp(request), limit, window);
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            String[] parts = forwarded.split(",");
+            if (parts.length > 0 && !parts[0].isBlank()) {
+                return parts[0].trim();
+            }
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 }

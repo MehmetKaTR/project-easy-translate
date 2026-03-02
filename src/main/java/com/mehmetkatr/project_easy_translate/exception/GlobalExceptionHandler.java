@@ -65,6 +65,15 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleRateLimit(RateLimitExceededException exception) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                "code", "RATE_LIMITED",
+                "error", exception.getMessage(),
+                "retryAfterSeconds", exception.getRetryAfterSeconds()
+        ));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException exception) {
         return ResponseEntity.badRequest().body(Map.of(

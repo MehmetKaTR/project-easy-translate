@@ -7,10 +7,17 @@ import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -49,7 +56,7 @@ public class WordListService {
         wordListRepository.findByUserAndName(wordList.getUser(), wordList.getName())
                 .ifPresent(existing -> {
                     throw new IllegalArgumentException("This user already has a WordList with the same name.");
-        });
+                });
 
         return wordListRepository.save(wordList);
     }
@@ -65,6 +72,54 @@ public class WordListService {
 
         existing.setName(updatedWordList.getName());
         existing.setWords(updatedWordList.getWords());
+
+        return wordListRepository.save(existing);
+    }
+
+    public WordList updateWordListOwnedByUser(
+            Long userId,
+            WordList existing,
+            String name,
+            String color,
+            List<Long> requestedWordIds
+    ) {
+        if (existing.getUser() == null || !Objects.equals(existing.getUser().getId(), userId)) {
+            throw new AccessDeniedException("You cannot update another user's word list");
+        }
+
+        String normalizedName = name == null ? "" : name.trim();
+        if (!normalizedName.isBlank()) {
+            wordListRepository.findByUserAndName(existing.getUser(), normalizedName)
+                    .filter(wl -> !wl.getId().equals(existing.getId()))
+                    .ifPresent(conflict -> {
+                        throw new IllegalArgumentException("This user already has a WordList with the same name.");
+                    });
+            existing.setName(normalizedName);
+        }
+
+        String normalizedColor = color == null ? "" : color.trim();
+        if (!normalizedColor.isBlank()) {
+            existing.setHexColorCode(normalizedColor);
+        }
+
+        Set<Long> dedupedIds = requestedWordIds == null
+                ? Set.of()
+                : requestedWordIds.stream().filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (requestedWordIds != null) {
+            Map<Long, Word> userWordsById = wordRepository.findAllByUserId(userId).stream()
+                    .collect(Collectors.toMap(Word::getId, word -> word));
+
+            List<Word> selectedWords = new ArrayList<>();
+            for (Long wordId : dedupedIds) {
+                Word word = userWordsById.get(wordId);
+                if (word != null) {
+                    word.setWordList(existing);
+                    selectedWords.add(word);
+                }
+            }
+            existing.setWords(selectedWords);
+        }
 
         return wordListRepository.save(existing);
     }
