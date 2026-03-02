@@ -341,6 +341,19 @@ public class UserService {
         return expiredUsers.size();
     }
 
+    @Transactional
+    public void markOnboardingCompleted(String authenticatedUsername) {
+        User user = userRepository.findByUsername(authenticatedUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found"));
+
+        if (user.isOnboardingCompleted()) {
+            return;
+        }
+
+        user.setOnboardingCompleted(true);
+        userRepository.save(user);
+    }
+
     private void ensureDefaultWordList(User savedUser) {
         WordList generalList = WordList.builder()
                 .name("All")
@@ -487,6 +500,7 @@ public class UserService {
                 .preferredLanguage(user.getPreferredLanguage().name())
                 .themePreference(user.getThemePreference().name())
                 .emailVerified(user.isEmailVerified())
+                .onboardingCompleted(user.isOnboardingCompleted())
                 .build();
     }
 }

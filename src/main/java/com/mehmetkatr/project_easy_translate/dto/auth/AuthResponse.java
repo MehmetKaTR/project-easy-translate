@@ -16,4 +16,5 @@ public class AuthResponse {
     private String preferredLanguage;
     private String themePreference;
     private Boolean emailVerified;
+    private Boolean onboardingCompleted;
 }

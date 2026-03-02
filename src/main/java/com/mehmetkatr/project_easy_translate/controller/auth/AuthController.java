@@ -96,4 +96,16 @@ public class AuthController {
         AccountDeletionResponse response = userService.requestAccountDeletion(authentication.getName());
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/onboarding/complete")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<GenericMessageResponse> completeOnboarding(Authentication authentication) {
+        userService.markOnboardingCompleted(authentication.getName());
+        return ResponseEntity.ok(
+                GenericMessageResponse.builder()
+                        .code("ONBOARDING_COMPLETED")
+                        .message("Onboarding marked as completed.")
+                        .build()
+        );
+    }
 }
