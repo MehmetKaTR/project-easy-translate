@@ -31,7 +31,7 @@ public class TokenUsageLogService {
 
     public int findTokenUsageByStoryId(String storyId) {
         TokenUsageLog tokenUsageLog = tokenUsageLogRepository.findByStoryId(storyId);
-        return tokenUsageLog.getTokensUsed();
+        return tokenUsageLog == null ? 0 : tokenUsageLog.getTokensUsed();
     }
 
     public int sumTokensByUserBetween(User user, LocalDateTime start, LocalDateTime end) {

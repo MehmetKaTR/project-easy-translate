@@ -102,6 +102,9 @@ public class WordListController {
         }
 
         WordList wordList = wordListOpt.get();
+        if ("all".equalsIgnoreCase(String.valueOf(wordList.getName()).trim())) {
+            return ResponseEntity.status(409).build();
+        }
         wordListService.deleteWordList(wordList.getId());
 
         return ResponseEntity.ok(new WordListDTO(wordList));
