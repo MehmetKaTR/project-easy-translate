@@ -6,6 +6,7 @@ import com.mehmetkatr.project_easy_translate.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +22,8 @@ public class AuthController {
 
     private final UserService userService;
     private final AuthRateLimitService authRateLimitService;
+    @Value("${app.auth.enable-google-dev-endpoint:false}")
+    private boolean enableGoogleDevEndpoint;
 
     @PostMapping("/register")
     public ResponseEntity<GenericMessageResponse> register(
@@ -122,6 +125,9 @@ public class AuthController {
             @Valid @RequestBody SocialLoginRequest request,
             HttpServletRequest httpRequest
     ) {
+        if (!enableGoogleDevEndpoint) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
         throttle(httpRequest, "social-google-dev", 25, Duration.ofMinutes(5));
         AuthResponse response = userService.socialLogin(request.getEmail(), request.getUsername());
         return ResponseEntity.ok(response);
@@ -168,8 +174,11 @@ public class AuthController {
         String forwarded = request.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
             String[] parts = forwarded.split(",");
-            if (parts.length > 0 && !parts[0].isBlank()) {
-                return parts[0].trim();
+            for (int i = parts.length - 1; i >= 0; i--) {
+                String candidate = parts[i].trim();
+                if (!candidate.isBlank()) {
+                    return candidate;
+                }
             }
         }
         String realIp = request.getHeader("X-Real-IP");
