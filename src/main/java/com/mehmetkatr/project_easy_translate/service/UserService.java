@@ -138,17 +138,16 @@ public class UserService {
         registerUser(username, email, rawPassword);
     }
 
-    public AuthResponse login(String username, String rawPassword) {
+    public AuthResponse login(String identifier, String rawPassword) {
         purgeExpiredPendingDeletions();
 
-        String normalizedUsername = normalizeUsername(username);
-
-        User user = userRepository.findFirstByUsernameIgnoreCase(normalizedUsername)
+        User user = findByIdentifier(identifier)
                 .orElseThrow(() -> new AuthenticationFailedException("Invalid username or password"));
 
         assertAccountNotPendingDeletion(user);
 
-        if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+        String passwordHash = user.getPasswordHash();
+        if (passwordHash == null || passwordHash.isBlank() || !passwordEncoder.matches(rawPassword, passwordHash)) {
             throw new AuthenticationFailedException("Invalid username or password");
         }
 
