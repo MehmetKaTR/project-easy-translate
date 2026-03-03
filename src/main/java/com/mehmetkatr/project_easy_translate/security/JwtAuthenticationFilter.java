@@ -1,6 +1,8 @@
 package com.mehmetkatr.project_easy_translate.security;
 
+import com.mehmetkatr.project_easy_translate.entity.Admin;
 import com.mehmetkatr.project_easy_translate.entity.User;
+import com.mehmetkatr.project_easy_translate.repository.AdminRepository;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import com.mehmetkatr.project_easy_translate.service.TokenService;
 import jakarta.servlet.FilterChain;
@@ -33,11 +35,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/auth/register",
             "/api/auth/social/google",
             "/api/auth/social/google/dev",
+            "/api/admin/auth/login",
+            "/api/admin/auth/status",
+            "/api/admin/auth/bootstrap",
             "/api/public/"
     );
 
     private final TokenService tokenService;
     private final UserRepository userRepository;
+    private final AdminRepository adminRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -56,21 +62,37 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String username = tokenService.getUsernameFromToken(jwt);
+        String subject = tokenService.getUsernameFromToken(jwt);
         String role = tokenService.getRoleFromToken(jwt);
         String normalizedRole = role != null && role.startsWith("ROLE_") ? role : "ROLE_USER";
 
-        Optional<User> userOpt = userRepository.findFirstByUsernameIgnoreCase(username);
-        if (userOpt.isPresent() && !userOpt.get().isEmailVerified() && !isVerificationExempt(request.getRequestURI())) {
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"code\":\"EMAIL_NOT_VERIFIED\",\"error\":\"Email is not verified. Please verify your email first.\"}");
-            return;
+        if ("ROLE_USER".equals(normalizedRole)) {
+            Optional<User> userOpt = userRepository.findFirstByUsernameIgnoreCase(subject);
+            if (userOpt.isEmpty()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            User user = userOpt.get();
+            if (!user.isEmailVerified() && !isVerificationExempt(request.getRequestURI())) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"code\":\"EMAIL_NOT_VERIFIED\",\"error\":\"Email is not verified. Please verify your email first.\"}");
+                return;
+            }
+        }
+
+        if ("ROLE_ADMIN".equals(normalizedRole)) {
+            Optional<Admin> adminOpt = adminRepository.findFirstByUsernameIgnoreCase(subject);
+            if (adminOpt.isEmpty()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
         }
 
         UsernamePasswordAuthenticationToken authenticationToken =
                 new UsernamePasswordAuthenticationToken(
-                        username,
+                        subject,
                         null,
                         List.of(new SimpleGrantedAuthority(normalizedRole))
                 );
