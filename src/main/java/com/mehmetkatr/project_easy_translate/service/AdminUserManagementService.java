@@ -4,8 +4,6 @@ import com.mehmetkatr.project_easy_translate.dto.admin.AdminUserUpdateRequest;
 import com.mehmetkatr.project_easy_translate.entity.Admin;
 import com.mehmetkatr.project_easy_translate.entity.AdminActionLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
-import com.mehmetkatr.project_easy_translate.entity.Word;
-import com.mehmetkatr.project_easy_translate.entity.WordList;
 import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
@@ -18,11 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -147,29 +143,11 @@ public class AdminUserManagementService {
     }
 
     private void cleanupWordListsAndWordsForUser(Long userId) {
-        List<WordList> wordLists = wordListRepository.findAllByUserIdWithWords(userId);
-
-        for (WordList wordList : wordLists) {
-            Set<Word> linkedWords = new LinkedHashSet<>(wordList.getWords());
-            for (Word word : linkedWords) {
-                word.getWordLists().remove(wordList);
-            }
-            wordList.getWords().clear();
-            if (!linkedWords.isEmpty()) {
-                wordRepository.saveAll(linkedWords);
-            }
-        }
-
-        if (!wordLists.isEmpty()) {
-            wordListRepository.deleteAll(wordLists);
-            wordListRepository.flush();
-        }
-
-        List<Word> userWords = wordRepository.findAllByUserId(userId);
-        if (!userWords.isEmpty()) {
-            wordRepository.deleteAll(userWords);
-            wordRepository.flush();
-        }
+        // FK-safe cleanup order for user-owned dictionary data.
+        wordListRepository.deleteWordlistLinksByUserId(userId);
+        wordRepository.deleteWordlistLinksByWordOwnerId(userId);
+        wordListRepository.deleteByUserIdNative(userId);
+        wordRepository.deleteByUserIdNative(userId);
     }
 
     private Admin resolveAdminForAudit(String adminIdentifier) {
