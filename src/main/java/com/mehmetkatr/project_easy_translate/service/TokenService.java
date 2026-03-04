@@ -21,14 +21,29 @@ public class TokenService {
 
     @Value("${jwt.expiration-ms}")
     private Long jwtExpirationMs;
+    @Value("${app.admin.jwt.expiration-ms:86400000}")
+    private Long adminJwtExpirationMs;
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(String username, String role) {
+        return generateToken(username, role, jwtExpirationMs);
+    }
+
+    public String generateAdminToken(String username) {
+        return generateToken(username, "ROLE_ADMIN", adminJwtExpirationMs != null ? adminJwtExpirationMs : jwtExpirationMs);
+    }
+
+    private String generateToken(String username, String role, Long expirationMs) {
+        long ttlMs = expirationMs != null ? expirationMs : 3600000L;
+        if (ttlMs < 1000L) {
+            ttlMs = 1000L;
+        }
+
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
+        Date expiryDate = new Date(now.getTime() + ttlMs);
 
         return Jwts.builder()
                 .setSubject(username)

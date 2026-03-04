@@ -49,7 +49,7 @@ public class AdminAuthController {
         }
 
         Admin admin = adminService.registerAdmin(request.getUsername(), request.getEmail(), request.getPassword());
-        String token = tokenService.generateToken(admin.getUsername(), "ROLE_ADMIN");
+        String token = tokenService.generateAdminToken(admin.getUsername());
 
         return ResponseEntity.ok(
                 AdminAuthResponse.builder()
@@ -64,7 +64,7 @@ public class AdminAuthController {
     @PostMapping("/login")
     public ResponseEntity<AdminAuthResponse> login(@Valid @RequestBody AdminLoginRequest request) {
         Admin admin = adminService.authenticate(request.getIdentifier(), request.getPassword());
-        String token = tokenService.generateToken(admin.getUsername(), "ROLE_ADMIN");
+        String token = tokenService.generateAdminToken(admin.getUsername());
 
         return ResponseEntity.ok(
                 AdminAuthResponse.builder()
