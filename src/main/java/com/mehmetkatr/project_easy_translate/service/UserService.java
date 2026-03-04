@@ -9,6 +9,7 @@ import com.mehmetkatr.project_easy_translate.exception.AccountPendingDeletionExc
 import com.mehmetkatr.project_easy_translate.exception.AuthenticationFailedException;
 import com.mehmetkatr.project_easy_translate.exception.EmailNotVerifiedException;
 import com.mehmetkatr.project_easy_translate.exception.InvalidCodeException;
+import com.mehmetkatr.project_easy_translate.exception.RateLimitExceededException;
 import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
@@ -426,12 +427,26 @@ public class UserService {
     }
 
     private void issueEmailVerificationCode(User user) {
+        if (user.getEmailVerificationCode() != null && user.getEmailVerificationExpiresAt() != null) {
+            LocalDateTime now = LocalDateTime.now();
+            if (user.getEmailVerificationExpiresAt().isAfter(now)) {
+                long retryAfterSeconds = java.time.Duration.between(now, user.getEmailVerificationExpiresAt()).getSeconds();
+                throw new RateLimitExceededException("A verification code is already active. Please wait before requesting a new one.", Math.max(1L, retryAfterSeconds));
+            }
+        }
         user.setEmailVerificationCode(generateCode());
         user.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(Math.max(5, emailVerificationCodeTtlMinutes)));
         userRepository.save(user);
     }
 
     private void issuePasswordResetCode(User user) {
+        if (user.getPasswordResetCode() != null && user.getPasswordResetExpiresAt() != null) {
+            LocalDateTime now = LocalDateTime.now();
+            if (user.getPasswordResetExpiresAt().isAfter(now)) {
+                long retryAfterSeconds = java.time.Duration.between(now, user.getPasswordResetExpiresAt()).getSeconds();
+                throw new RateLimitExceededException("A reset code is already active. Please wait before requesting a new one.", Math.max(1L, retryAfterSeconds));
+            }
+        }
         user.setPasswordResetCode(generateCode());
         user.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(Math.max(5, passwordResetCodeTtlMinutes)));
         userRepository.save(user);
