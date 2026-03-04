@@ -35,6 +35,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final GoogleTokenVerifierService googleTokenVerifierService;
     private final EmailDeliveryService emailDeliveryService;
+    private final RefreshTokenService refreshTokenService;
 
     @Value("${app.account.deletion.grace-days:7}")
     private int accountDeletionGraceDays;
@@ -142,7 +143,7 @@ public class UserService {
         registerUser(username, email, rawPassword);
     }
 
-    public AuthResponse login(String identifier, String rawPassword) {
+    public AuthResponse login(String identifier, String rawPassword, String clientIp, String userAgent) {
         purgeExpiredPendingDeletions();
 
         User user = findByIdentifier(identifier)
@@ -160,30 +161,32 @@ public class UserService {
         }
 
         String token = tokenService.generateToken(user.getUsername(), "ROLE_USER");
-        return buildAuthResponse(user, token);
+        String refreshToken = refreshTokenService.issueRefreshToken(user, clientIp, userAgent);
+        return buildAuthResponse(user, token, refreshToken);
     }
 
     @Transactional
-    public AuthResponse socialLogin(String email, String username) {
+    public AuthResponse socialLogin(String email, String username, String clientIp, String userAgent) {
         User user = registerOrLoginSocial(email, username);
         String token = tokenService.generateToken(user.getUsername(), "ROLE_USER");
-        return buildAuthResponse(user, token);
+        String refreshToken = refreshTokenService.issueRefreshToken(user, clientIp, userAgent);
+        return buildAuthResponse(user, token, refreshToken);
     }
 
     @Transactional
-    public AuthResponse loginWithGoogleIdToken(String idToken) {
-        return loginWithGoogleIdToken(idToken, null);
+    public AuthResponse loginWithGoogleIdToken(String idToken, String clientIp, String userAgent) {
+        return loginWithGoogleIdToken(idToken, null, clientIp, userAgent);
     }
 
     @Transactional
-    public AuthResponse loginWithGoogleIdToken(String idToken, String preferredUsername) {
+    public AuthResponse loginWithGoogleIdToken(String idToken, String preferredUsername, String clientIp, String userAgent) {
         purgeExpiredPendingDeletions();
 
         GoogleTokenVerifierService.VerifiedGoogleUser googleUser = googleTokenVerifierService.verifyIdToken(idToken);
         String normalizedEmail = normalizeEmail(googleUser.email());
         Optional<User> existingUser = userRepository.findFirstByEmailIgnoreCase(normalizedEmail);
         if (existingUser.isPresent()) {
-            return socialLogin(googleUser.email(), googleUser.username());
+            return socialLogin(googleUser.email(), googleUser.username(), clientIp, userAgent);
         }
 
         String requestedUsername = normalizeUsername(preferredUsername);
@@ -191,7 +194,21 @@ public class UserService {
             throw new ResourceConflictException("GOOGLE_USERNAME_REQUIRED", "Choose a username to complete Google sign-up");
         }
 
-        return socialLogin(googleUser.email(), requestedUsername);
+        return socialLogin(googleUser.email(), requestedUsername, clientIp, userAgent);
+    }
+
+    @Transactional
+    public AuthResponse refreshSession(String rawRefreshToken, String clientIp, String userAgent) {
+        RefreshTokenService.RotationResult rotated = refreshTokenService.rotateRefreshToken(rawRefreshToken, clientIp, userAgent);
+        User user = rotated.user();
+        assertAccountNotPendingDeletion(user);
+        String token = tokenService.generateToken(user.getUsername(), "ROLE_USER");
+        return buildAuthResponse(user, token, rotated.newRefreshToken());
+    }
+
+    @Transactional
+    public void logout(String rawRefreshToken, String clientIp, String userAgent) {
+        refreshTokenService.revokeByRawToken(rawRefreshToken, clientIp, userAgent);
     }
 
     @Transactional
@@ -581,11 +598,13 @@ public class UserService {
                 .build();
     }
 
-    private AuthResponse buildAuthResponse(User user, String token) {
+    private AuthResponse buildAuthResponse(User user, String token, String refreshToken) {
         return AuthResponse.builder()
                 .userId(user.getId())
                 .username(user.getUsername())
                 .token(token)
+                .accessTokenExpiresInSeconds(tokenService.getAccessTokenExpiresInSeconds())
+                .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .plan(user.getSubscriptionLevel().name())
                 .preferredLanguage(user.getPreferredLanguage().name())

@@ -72,4 +72,8 @@ public class TokenService {
 
         return claims.get("role", String.class);
     }
+
+    public long getAccessTokenExpiresInSeconds() {
+        return Math.max(1L, (jwtExpirationMs == null ? 0L : jwtExpirationMs) / 1000L);
+    }
 }

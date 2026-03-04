@@ -22,6 +22,14 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidRefreshToken(InvalidRefreshTokenException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "code", "INVALID_REFRESH_TOKEN",
+                "error", exception.getMessage()
+        ));
+    }
+
     @ExceptionHandler(EmailNotVerifiedException.class)
     public ResponseEntity<Map<String, Object>> handleEmailNotVerified(EmailNotVerifiedException exception) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
