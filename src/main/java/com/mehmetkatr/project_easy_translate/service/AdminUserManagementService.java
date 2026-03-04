@@ -4,8 +4,12 @@ import com.mehmetkatr.project_easy_translate.dto.admin.AdminUserUpdateRequest;
 import com.mehmetkatr.project_easy_translate.entity.Admin;
 import com.mehmetkatr.project_easy_translate.entity.AdminActionLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
+import com.mehmetkatr.project_easy_translate.entity.Word;
+import com.mehmetkatr.project_easy_translate.entity.WordList;
 import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
+import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
+import com.mehmetkatr.project_easy_translate.repository.WordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
@@ -14,9 +18,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +33,8 @@ public class AdminUserManagementService {
     private final AdminService adminService;
     private final AdminActionLogService adminActionLogService;
     private final PasswordEncoder passwordEncoder;
+    private final WordListRepository wordListRepository;
+    private final WordRepository wordRepository;
 
     @Value("${app.account.deletion.grace-days:7}")
     private int accountDeletionGraceDays;
@@ -133,8 +141,35 @@ public class AdminUserManagementService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        cleanupWordListsAndWordsForUser(user.getId());
         logIfPossible(admin, null, AdminActionLog.AdminActionType.DELETE_USER);
         userRepository.delete(user);
+    }
+
+    private void cleanupWordListsAndWordsForUser(Long userId) {
+        List<WordList> wordLists = wordListRepository.findAllByUserIdWithWords(userId);
+
+        for (WordList wordList : wordLists) {
+            Set<Word> linkedWords = new LinkedHashSet<>(wordList.getWords());
+            for (Word word : linkedWords) {
+                word.getWordLists().remove(wordList);
+            }
+            wordList.getWords().clear();
+            if (!linkedWords.isEmpty()) {
+                wordRepository.saveAll(linkedWords);
+            }
+        }
+
+        if (!wordLists.isEmpty()) {
+            wordListRepository.deleteAll(wordLists);
+            wordListRepository.flush();
+        }
+
+        List<Word> userWords = wordRepository.findAllByUserId(userId);
+        if (!userWords.isEmpty()) {
+            wordRepository.deleteAll(userWords);
+            wordRepository.flush();
+        }
     }
 
     private Admin resolveAdminForAudit(String adminIdentifier) {
