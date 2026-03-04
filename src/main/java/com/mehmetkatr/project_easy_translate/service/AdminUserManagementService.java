@@ -5,6 +5,11 @@ import com.mehmetkatr.project_easy_translate.entity.Admin;
 import com.mehmetkatr.project_easy_translate.entity.AdminActionLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
+import com.mehmetkatr.project_easy_translate.repository.AdminActionLogRepository;
+import com.mehmetkatr.project_easy_translate.repository.ImportExportLogRepository;
+import com.mehmetkatr.project_easy_translate.repository.RefreshTokenRepository;
+import com.mehmetkatr.project_easy_translate.repository.StoryRepository;
+import com.mehmetkatr.project_easy_translate.repository.TokenUsageLogRepository;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordRepository;
@@ -31,6 +36,11 @@ public class AdminUserManagementService {
     private final PasswordEncoder passwordEncoder;
     private final WordListRepository wordListRepository;
     private final WordRepository wordRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final TokenUsageLogRepository tokenUsageLogRepository;
+    private final ImportExportLogRepository importExportLogRepository;
+    private final AdminActionLogRepository adminActionLogRepository;
+    private final StoryRepository storyRepository;
 
     @Value("${app.account.deletion.grace-days:7}")
     private int accountDeletionGraceDays;
@@ -137,17 +147,25 @@ public class AdminUserManagementService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        cleanupWordListsAndWordsForUser(user.getId());
+        cleanupUserData(user.getId());
         logIfPossible(admin, null, AdminActionLog.AdminActionType.DELETE_USER);
         userRepository.delete(user);
     }
 
-    private void cleanupWordListsAndWordsForUser(Long userId) {
-        // FK-safe cleanup order for user-owned dictionary data.
+    private void cleanupUserData(Long userId) {
+        // Delete all relational dependencies first, then remove user.
+        refreshTokenRepository.deleteByUserIdNative(userId);
+        tokenUsageLogRepository.deleteByUserIdNative(userId);
+        importExportLogRepository.deleteByUserIdNative(userId);
+        adminActionLogRepository.deleteByTargetUserIdNative(userId);
+
         wordListRepository.deleteWordlistLinksByUserId(userId);
         wordRepository.deleteWordlistLinksByWordOwnerId(userId);
         wordListRepository.deleteByUserIdNative(userId);
         wordRepository.deleteByUserIdNative(userId);
+
+        // Mongo stories are not constrained by SQL FKs but should be deleted with user.
+        storyRepository.deleteByUserId(userId);
     }
 
     private Admin resolveAdminForAudit(String adminIdentifier) {

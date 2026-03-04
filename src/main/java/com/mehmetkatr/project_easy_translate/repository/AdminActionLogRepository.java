@@ -4,6 +4,9 @@ import com.mehmetkatr.project_easy_translate.entity.Admin;
 import com.mehmetkatr.project_easy_translate.entity.AdminActionLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -16,4 +19,8 @@ public interface AdminActionLogRepository extends JpaRepository<AdminActionLog, 
     List<AdminActionLog> findByAdminAndTargetUser(Admin admin, User targetUser);
 
     List<AdminActionLog> findByActionType(AdminActionLog.AdminActionType actionType);
+
+    @Modifying
+    @Query(value = "DELETE FROM admin_action_log WHERE target_user_id = :userId", nativeQuery = true)
+    int deleteByTargetUserIdNative(@Param("userId") Long userId);
 }
