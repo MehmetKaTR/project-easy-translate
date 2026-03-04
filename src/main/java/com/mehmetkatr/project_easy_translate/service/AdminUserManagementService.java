@@ -49,7 +49,7 @@ public class AdminUserManagementService {
     }
 
     public User updateUser(String adminIdentifier, Long userId, AdminUserUpdateRequest request) {
-        Admin admin = adminService.getByIdentifierOrThrow(adminIdentifier);
+        Admin admin = resolveAdminForAudit(adminIdentifier);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -87,7 +87,7 @@ public class AdminUserManagementService {
 
         if (request.getSubscriptionLevel() != null && user.getSubscriptionLevel() != request.getSubscriptionLevel()) {
             user.setSubscriptionLevel(request.getSubscriptionLevel());
-            adminActionLogService.logAction(admin, user, AdminActionLog.AdminActionType.UPDATE_SUBSCRIPTION);
+            logIfPossible(admin, user, AdminActionLog.AdminActionType.UPDATE_SUBSCRIPTION);
         }
 
         if (request.getTokenBalance() != null && user.getTokenBalance() != request.getTokenBalance()) {
@@ -95,7 +95,7 @@ public class AdminUserManagementService {
                 throw new IllegalArgumentException("Token balance cannot be negative");
             }
             user.setTokenBalance(request.getTokenBalance());
-            adminActionLogService.logAction(admin, user, AdminActionLog.AdminActionType.UPDATE_TOKEN_LIMIT);
+            logIfPossible(admin, user, AdminActionLog.AdminActionType.UPDATE_TOKEN_LIMIT);
         }
 
         if (request.getEmailVerified() != null) {
@@ -116,12 +116,12 @@ public class AdminUserManagementService {
                 user.setPendingDeletion(true);
                 user.setDeletionRequestedAt(now);
                 user.setDeletionScheduledAt(now.plusDays(Math.max(1, accountDeletionGraceDays)));
-                adminActionLogService.logAction(admin, user, AdminActionLog.AdminActionType.SUSPEND_USER);
+                logIfPossible(admin, user, AdminActionLog.AdminActionType.SUSPEND_USER);
             } else {
                 user.setPendingDeletion(false);
                 user.setDeletionRequestedAt(null);
                 user.setDeletionScheduledAt(null);
-                adminActionLogService.logAction(admin, user, AdminActionLog.AdminActionType.REACTIVATE_USER);
+                logIfPossible(admin, user, AdminActionLog.AdminActionType.REACTIVATE_USER);
             }
         }
 
@@ -129,12 +129,35 @@ public class AdminUserManagementService {
     }
 
     public void deleteUser(String adminIdentifier, Long userId) {
-        Admin admin = adminService.getByIdentifierOrThrow(adminIdentifier);
+        Admin admin = resolveAdminForAudit(adminIdentifier);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        adminActionLogService.logAction(admin, null, AdminActionLog.AdminActionType.DELETE_USER);
+        logIfPossible(admin, null, AdminActionLog.AdminActionType.DELETE_USER);
         userRepository.delete(user);
+    }
+
+    private Admin resolveAdminForAudit(String adminIdentifier) {
+        if (adminIdentifier != null && !adminIdentifier.isBlank()) {
+            Optional<Admin> byIdentifier = adminService.findByIdentifier(adminIdentifier);
+            if (byIdentifier.isPresent()) {
+                return byIdentifier.get();
+            }
+        }
+
+        List<Admin> allAdmins = adminService.findAll();
+        if (!allAdmins.isEmpty()) {
+            return allAdmins.get(0);
+        }
+
+        return null;
+    }
+
+    private void logIfPossible(Admin admin, User targetUser, AdminActionLog.AdminActionType actionType) {
+        if (admin == null) {
+            return;
+        }
+        adminActionLogService.logAction(admin, targetUser, actionType);
     }
 
     private boolean containsIgnoreCase(String value, String normalizedQuery) {
