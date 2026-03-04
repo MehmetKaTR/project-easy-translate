@@ -45,6 +45,9 @@ public class UserService {
     @Value("${app.auth.password-reset-code-ttl-minutes:15}")
     private int passwordResetCodeTtlMinutes;
 
+    @Value("${app.auth.code-resend-cooldown-seconds:180}")
+    private int codeResendCooldownSeconds;
+
     public List<User> findAll() {
         return userRepository.findAll();
     }
@@ -430,8 +433,13 @@ public class UserService {
         if (user.getEmailVerificationCode() != null && user.getEmailVerificationExpiresAt() != null) {
             LocalDateTime now = LocalDateTime.now();
             if (user.getEmailVerificationExpiresAt().isAfter(now)) {
-                long retryAfterSeconds = java.time.Duration.between(now, user.getEmailVerificationExpiresAt()).getSeconds();
-                throw new RateLimitExceededException("A verification code is already active. Please wait before requesting a new one.", Math.max(1L, retryAfterSeconds));
+                LocalDateTime issuedAt = user.getEmailVerificationExpiresAt()
+                        .minusMinutes(Math.max(5, emailVerificationCodeTtlMinutes));
+                LocalDateTime availableAt = issuedAt.plusSeconds(Math.max(1, codeResendCooldownSeconds));
+                if (availableAt.isAfter(now)) {
+                    long retryAfterSeconds = java.time.Duration.between(now, availableAt).getSeconds();
+                    throw new RateLimitExceededException("A verification code is already active. Please wait before requesting a new one.", Math.max(1L, retryAfterSeconds));
+                }
             }
         }
         user.setEmailVerificationCode(generateCode());
@@ -443,8 +451,13 @@ public class UserService {
         if (user.getPasswordResetCode() != null && user.getPasswordResetExpiresAt() != null) {
             LocalDateTime now = LocalDateTime.now();
             if (user.getPasswordResetExpiresAt().isAfter(now)) {
-                long retryAfterSeconds = java.time.Duration.between(now, user.getPasswordResetExpiresAt()).getSeconds();
-                throw new RateLimitExceededException("A reset code is already active. Please wait before requesting a new one.", Math.max(1L, retryAfterSeconds));
+                LocalDateTime issuedAt = user.getPasswordResetExpiresAt()
+                        .minusMinutes(Math.max(5, passwordResetCodeTtlMinutes));
+                LocalDateTime availableAt = issuedAt.plusSeconds(Math.max(1, codeResendCooldownSeconds));
+                if (availableAt.isAfter(now)) {
+                    long retryAfterSeconds = java.time.Duration.between(now, availableAt).getSeconds();
+                    throw new RateLimitExceededException("A reset code is already active. Please wait before requesting a new one.", Math.max(1L, retryAfterSeconds));
+                }
             }
         }
         user.setPasswordResetCode(generateCode());
