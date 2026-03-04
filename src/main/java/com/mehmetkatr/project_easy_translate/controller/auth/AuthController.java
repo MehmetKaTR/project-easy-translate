@@ -24,6 +24,8 @@ public class AuthController {
     private final AuthRateLimitService authRateLimitService;
     @Value("${app.auth.enable-google-dev-endpoint:false}")
     private boolean enableGoogleDevEndpoint;
+    @Value("${app.auth.trust-forwarded-headers:false}")
+    private boolean trustForwardedHeaders;
 
     @PostMapping("/register")
     public ResponseEntity<GenericMessageResponse> register(
@@ -171,19 +173,21 @@ public class AuthController {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            String[] parts = forwarded.split(",");
-            for (int i = parts.length - 1; i >= 0; i--) {
-                String candidate = parts[i].trim();
-                if (!candidate.isBlank()) {
-                    return candidate;
+        if (trustForwardedHeaders) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                String[] parts = forwarded.split(",");
+                for (int i = parts.length - 1; i >= 0; i--) {
+                    String candidate = parts[i].trim();
+                    if (!candidate.isBlank()) {
+                        return candidate;
+                    }
                 }
             }
-        }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) {
-            return realIp.trim();
+            String realIp = request.getHeader("X-Real-IP");
+            if (realIp != null && !realIp.isBlank()) {
+                return realIp.trim();
+            }
         }
         return request.getRemoteAddr();
     }
