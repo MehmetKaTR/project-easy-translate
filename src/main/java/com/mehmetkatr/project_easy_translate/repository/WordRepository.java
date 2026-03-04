@@ -3,6 +3,7 @@ package com.mehmetkatr.project_easy_translate.repository;
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Query;
 
@@ -49,4 +50,17 @@ public interface WordRepository extends JpaRepository<Word, Long> {
             @Param("translated") String translated,
             @Param("languageCode") String languageCode
     );
+
+    @Modifying
+    @Query(value = """
+            DELETE ww
+            FROM wordlist_words ww
+            INNER JOIN words w ON w.id = ww.word_id
+            WHERE w.user_id = :userId
+            """, nativeQuery = true)
+    int deleteWordlistLinksByWordOwnerId(@Param("userId") Long userId);
+
+    @Modifying
+    @Query(value = "DELETE FROM words WHERE user_id = :userId", nativeQuery = true)
+    int deleteByUserIdNative(@Param("userId") Long userId);
 }
