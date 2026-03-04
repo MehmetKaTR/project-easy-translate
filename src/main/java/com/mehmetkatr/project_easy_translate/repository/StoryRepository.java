@@ -22,4 +22,6 @@ public interface StoryRepository extends MongoRepository<Story, String> {
     List<Story> findByCreatedAtBetween(Date startDate, Date endDate);
 
     Optional<Story> findByIdAndUserId(String id, Long userId);
+
+    long deleteByUserId(Long userId);
 }
