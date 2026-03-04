@@ -108,7 +108,12 @@ public class AuthController {
             HttpServletRequest httpRequest
     ) {
         throttle(httpRequest, "login", 25, Duration.ofMinutes(5));
-        AuthResponse response = userService.login(request.getUsername(), request.getPassword());
+        AuthResponse response = userService.login(
+                request.getUsername(),
+                request.getPassword(),
+                resolveClientIp(httpRequest),
+                resolveUserAgent(httpRequest)
+        );
         return ResponseEntity.ok(response);
     }
 
@@ -118,7 +123,12 @@ public class AuthController {
             HttpServletRequest httpRequest
     ) {
         throttle(httpRequest, "social-google", 25, Duration.ofMinutes(5));
-        AuthResponse response = userService.loginWithGoogleIdToken(request.getIdToken(), request.getPreferredUsername());
+        AuthResponse response = userService.loginWithGoogleIdToken(
+                request.getIdToken(),
+                request.getPreferredUsername(),
+                resolveClientIp(httpRequest),
+                resolveUserAgent(httpRequest)
+        );
         return ResponseEntity.ok(response);
     }
 
@@ -131,8 +141,42 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
         throttle(httpRequest, "social-google-dev", 25, Duration.ofMinutes(5));
-        AuthResponse response = userService.socialLogin(request.getEmail(), request.getUsername());
+        AuthResponse response = userService.socialLogin(
+                request.getEmail(),
+                request.getUsername(),
+                resolveClientIp(httpRequest),
+                resolveUserAgent(httpRequest)
+        );
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(
+            @Valid @RequestBody RefreshTokenRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        throttle(httpRequest, "refresh", 120, Duration.ofMinutes(5));
+        AuthResponse response = userService.refreshSession(
+                request.getRefreshToken(),
+                resolveClientIp(httpRequest),
+                resolveUserAgent(httpRequest)
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<GenericMessageResponse> logout(
+            @RequestBody(required = false) LogoutRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        String refreshToken = request == null ? null : request.getRefreshToken();
+        userService.logout(refreshToken, resolveClientIp(httpRequest), resolveUserAgent(httpRequest));
+        return ResponseEntity.ok(
+                GenericMessageResponse.builder()
+                        .code("LOGOUT_SUCCESS")
+                        .message("Logged out successfully.")
+                        .build()
+        );
     }
 
     @DeleteMapping("/account")
@@ -190,5 +234,12 @@ public class AuthController {
             }
         }
         return request.getRemoteAddr();
+    }
+
+    private String resolveUserAgent(HttpServletRequest request) {
+        String userAgent = request.getHeader("User-Agent");
+        if (userAgent == null) return null;
+        String trimmed = userAgent.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

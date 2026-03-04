@@ -11,6 +11,8 @@ public class AuthResponse {
     private Long userId;
     private String username;
     private String token;
+    private Long accessTokenExpiresInSeconds;
+    private String refreshToken;
     private String tokenType;
     private String plan;
     private String preferredLanguage;
