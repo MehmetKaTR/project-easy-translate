@@ -63,7 +63,8 @@ public class StoryGenerationService {
         validateDailyStoryGenerationLimit(user);
 
         String selectedModel = null;
-        String prompt = buildPrompt(request);
+        String translationTarget = normalizeTranslationTarget(request.getTranslationTarget());
+        String prompt = buildPrompt(request, translationTarget);
         String responseText = null;
 
         HttpClientErrorException.TooManyRequests lastQuotaError = null;
@@ -89,14 +90,16 @@ public class StoryGenerationService {
         ensureActiveModelRecord(selectedModel);
 
         String rawJson = extractGeminiText(responseText);
-        ParsedStory parsedStory = parseModelOutput(rawJson);
+        ParsedStory parsedStory = parseModelOutput(rawJson, translationTarget);
         int tokensUsed = extractTokensUsed(responseText);
         persistTokenUsage(user, tokensUsed);
 
         return StoryGenerateResponse.builder()
                 .title(parsedStory.title())
                 .story(parsedStory.storyEn())
-                .turkishTranslation(parsedStory.storyTr())
+                .turkishTranslation("tr".equals(translationTarget) ? parsedStory.storyTranslated() : "")
+                .translatedStory(parsedStory.storyTranslated())
+                .translatedLanguage(translationTarget)
                 .model(selectedModel)
                 .tokensUsed(tokensUsed)
                 .build();
@@ -124,12 +127,39 @@ public class StoryGenerationService {
                 .build();
     }
 
-    private String buildPrompt(StoryGenerateRequest request) {
+    private String buildPrompt(StoryGenerateRequest request, String translationTarget) {
         String words = request.getWords().stream()
                 .map(StoryGenerateRequest.WordItem::getWord)
                 .map(String::trim)
                 .filter(w -> !w.isBlank())
                 .collect(Collectors.joining(", "));
+
+        String translationFieldDescription = switch (translationTarget) {
+            case "de" -> "\"story_de\": \"German translation of the English story\"";
+            case "es" -> "\"story_es\": \"Spanish translation of the English story\"";
+            case "none" -> "";
+            default -> "\"story_tr\": \"Turkish translation of the English story\"";
+        };
+        String translationRule = switch (translationTarget) {
+            case "de" -> "- story_de must be natural German translation";
+            case "es" -> "- story_es must be natural Spanish translation";
+            case "none" -> "";
+            default -> "- story_tr must be natural Turkish translation";
+        };
+        String outputSchema = translationTarget.equals("none")
+                ? """
+                {
+                  "title": "max 8 words",
+                  "story_en": "English story only"
+                }
+                """
+                : """
+                {
+                  "title": "max 8 words",
+                  "story_en": "English story only",
+                  %s
+                }
+                """.formatted(translationFieldDescription);
 
         return """
                 You are an English learning assistant.
@@ -144,24 +174,24 @@ public class StoryGenerationService {
                 - Must naturally include all words: %s
                 
                 Output JSON schema:
-                {
-                  "title": "max 8 words",
-                  "story_en": "English story only",
-                  "story_tr": "Turkish translation of the English story"
-                }
+                %s
                 
                 Rules:
                 - No markdown
                 - No extra keys
                 - story_en must be CEFR %s compatible
-                - story_tr must be natural Turkish translation
+                - Include each required word exactly as given (same spelling, no inflection changes)
+                %s
                 """.formatted(
                 request.getLevel(),
                 request.getTopic(),
                 request.getSentiment(),
                 request.getLength(),
                 words,
+                outputSchema,
                 request.getLevel()
+                ,
+                translationRule
         );
     }
 
@@ -207,19 +237,25 @@ public class StoryGenerationService {
         }
     }
 
-    private ParsedStory parseModelOutput(String rawJson) {
+    private ParsedStory parseModelOutput(String rawJson, String translationTarget) {
         try {
             JsonNode root = objectMapper.readTree(rawJson == null ? "{}" : rawJson);
             String title = root.path("title").asText("New Story").trim();
             String storyEn = root.path("story_en").asText("").trim();
-            String storyTr = root.path("story_tr").asText("").trim();
+            String translationField = switch (translationTarget) {
+                case "de" -> "story_de";
+                case "es" -> "story_es";
+                case "none" -> "";
+                default -> "story_tr";
+            };
+            String translatedStory = translationField.isBlank() ? "" : root.path(translationField).asText("").trim();
 
             if (storyEn.isBlank()) {
                 throw new IllegalArgumentException("Gemini returned empty story");
             }
 
             if (title.isBlank()) title = "New Story";
-            return new ParsedStory(title, storyEn, storyTr);
+            return new ParsedStory(title, storyEn, translatedStory);
         } catch (Exception ex) {
             throw new IllegalArgumentException("Gemini output is not valid JSON");
         }
@@ -286,5 +322,13 @@ public class StoryGenerationService {
                 .build());
     }
 
-    private record ParsedStory(String title, String storyEn, String storyTr) {}
+    private String normalizeTranslationTarget(String input) {
+        String value = input == null ? "" : input.trim().toLowerCase();
+        return switch (value) {
+            case "tr", "de", "es", "none" -> value;
+            default -> "tr";
+        };
+    }
+
+    private record ParsedStory(String title, String storyEn, String storyTranslated) {}
 }

@@ -26,6 +26,8 @@ public class StoryGenerateRequest {
     @NotEmpty
     private List<WordItem> words;
 
+    private String translationTarget;
+
     @Getter
     @Setter
     public static class WordItem {
