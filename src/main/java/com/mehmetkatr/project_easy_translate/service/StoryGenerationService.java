@@ -191,7 +191,7 @@ public class StoryGenerationService {
                 - No extra keys
                 - story_en must be CEFR %s compatible
                 - Include each required word exactly as given (same spelling, no inflection changes)
-                - Never URL-encode output text (do not use %20, %0A, or + for spaces)
+                - Never URL-encode output text (do not use %%20, %%0A, or + for spaces)
                 %s
                 %s
                 """.formatted(
