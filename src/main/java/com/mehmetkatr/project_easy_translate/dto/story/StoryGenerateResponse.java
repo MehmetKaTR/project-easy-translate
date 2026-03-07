@@ -9,6 +9,8 @@ public class StoryGenerateResponse {
     private String title;
     private String story;
     private String turkishTranslation;
+    private String translatedStory;
+    private String translatedLanguage;
     private String model;
     private int tokensUsed;
 }
