@@ -100,6 +100,7 @@ public class StoryGenerationService {
                 .turkishTranslation("tr".equals(translationTarget) ? parsedStory.storyTranslated() : "")
                 .translatedStory(parsedStory.storyTranslated())
                 .translatedLanguage(translationTarget)
+                .translatedWordsCsv(parsedStory.translatedWordsCsv())
                 .model(selectedModel)
                 .tokensUsed(tokensUsed)
                 .build();
@@ -133,6 +134,7 @@ public class StoryGenerationService {
                 .map(String::trim)
                 .filter(w -> !w.isBlank())
                 .collect(Collectors.joining(", "));
+        int requiredWordCount = request.getWords() == null ? 0 : request.getWords().size();
 
         String translationFieldDescription = switch (translationTarget) {
             case "de" -> "\"story_de\": \"German translation of the English story\"";
@@ -146,6 +148,13 @@ public class StoryGenerationService {
             case "none" -> "";
             default -> "- story_tr must be natural Turkish translation";
         };
+        String translatedWordsSchema = translationTarget.equals("none")
+                ? ""
+                : "\"translated_words_csv\": \"comma-separated translated forms of required words in same order\"";
+        String translatedWordsRule = translationTarget.equals("none")
+                ? ""
+                : "- translated_words_csv must contain exactly " + requiredWordCount + " items in the same order as required words";
+
         String outputSchema = translationTarget.equals("none")
                 ? """
                 {
@@ -157,30 +166,33 @@ public class StoryGenerationService {
                 {
                   "title": "max 8 words",
                   "story_en": "English story only",
+                  %s,
                   %s
                 }
-                """.formatted(translationFieldDescription);
+                """.formatted(translationFieldDescription, translatedWordsSchema);
 
         return """
                 You are an English learning assistant.
-                
+
                 Write a story and return only valid JSON.
-                
+
                 Constraints:
                 - CEFR level: %s
                 - Topic: %s
                 - Sentiment: %s
                 - Length: %s
                 - Must naturally include all words: %s
-                
+
                 Output JSON schema:
                 %s
-                
+
                 Rules:
                 - No markdown
                 - No extra keys
                 - story_en must be CEFR %s compatible
                 - Include each required word exactly as given (same spelling, no inflection changes)
+                - Never URL-encode output text (do not use %20, %0A, or + for spaces)
+                %s
                 %s
                 """.formatted(
                 request.getLevel(),
@@ -189,9 +201,9 @@ public class StoryGenerationService {
                 request.getLength(),
                 words,
                 outputSchema,
-                request.getLevel()
-                ,
-                translationRule
+                request.getLevel(),
+                translationRule,
+                translatedWordsRule
         );
     }
 
@@ -249,13 +261,16 @@ public class StoryGenerationService {
                 default -> "story_tr";
             };
             String translatedStory = translationField.isBlank() ? "" : root.path(translationField).asText("").trim();
+            String translatedWordsCsv = translationTarget.equals("none")
+                    ? ""
+                    : root.path("translated_words_csv").asText("").trim();
 
             if (storyEn.isBlank()) {
                 throw new IllegalArgumentException("Gemini returned empty story");
             }
 
             if (title.isBlank()) title = "New Story";
-            return new ParsedStory(title, storyEn, translatedStory);
+            return new ParsedStory(title, storyEn, translatedStory, translatedWordsCsv);
         } catch (Exception ex) {
             throw new IllegalArgumentException("Gemini output is not valid JSON");
         }
@@ -330,5 +345,5 @@ public class StoryGenerationService {
         };
     }
 
-    private record ParsedStory(String title, String storyEn, String storyTranslated) {}
+    private record ParsedStory(String title, String storyEn, String storyTranslated, String translatedWordsCsv) {}
 }
