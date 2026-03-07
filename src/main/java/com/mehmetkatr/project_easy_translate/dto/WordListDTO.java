@@ -3,11 +3,13 @@ package com.mehmetkatr.project_easy_translate.dto;
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Getter
+@Setter
 public class WordListDTO {
     private Long id;
     private String name;
@@ -23,4 +25,3 @@ public class WordListDTO {
         this.words = new ArrayList<>(wordList.getWords());
     }
 }
-
