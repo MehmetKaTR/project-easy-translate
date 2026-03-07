@@ -116,6 +116,20 @@ public class WordListService {
                     selectedWords.add(word);
                 }
             }
+
+            // Many-to-many join table owner is Word.wordLists; keep both sides in sync.
+            Set<Word> previousWords = new LinkedHashSet<>(existing.getWords());
+
+            for (Word word : previousWords) {
+                if (!selectedWords.contains(word)) {
+                    word.getWordLists().remove(existing);
+                }
+            }
+
+            for (Word word : selectedWords) {
+                word.getWordLists().add(existing);
+            }
+
             existing.setWords(selectedWords);
         }
 
