@@ -3,6 +3,8 @@ package com.mehmetkatr.project_easy_translate.controller;
 import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateRequest;
 import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateResponse;
 import com.mehmetkatr.project_easy_translate.dto.story.StoryLimitStatusResponse;
+import com.mehmetkatr.project_easy_translate.dto.story.StoryWordValidationRequest;
+import com.mehmetkatr.project_easy_translate.dto.story.StoryWordValidationResponse;
 import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.service.StoryGenerationService;
 import jakarta.validation.Valid;
@@ -30,6 +32,16 @@ public class StoryGenerationController {
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         StoryGenerateResponse response = storyGenerationService.generateStory(authenticatedUserId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/validate-words")
+    public ResponseEntity<StoryWordValidationResponse> validateWords(
+            @RequestParam(required = false) Long userId,
+            @Valid @RequestBody StoryWordValidationRequest request
+    ) {
+        authenticatedUserResolver.resolveUserId(userId);
+        StoryWordValidationResponse response = storyGenerationService.validateWords(request);
         return ResponseEntity.ok(response);
     }
 
