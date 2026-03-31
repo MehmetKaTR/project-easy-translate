@@ -14,4 +14,6 @@ public class StoryWordValidationRequest {
     @Valid
     @NotEmpty
     private List<StoryGenerateRequest.WordItem> words;
+
+    private String translationTarget;
 }
