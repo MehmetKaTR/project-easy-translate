@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -102,7 +103,8 @@ public class StoryGenerationService {
         }
 
         try {
-            ModelCallResult modelCall = callGeminiWithFallback(buildValidationPrompt(words));
+            String translationTarget = normalizeTranslationTarget(request.getTranslationTarget());
+            ModelCallResult modelCall = callGeminiWithFallback(buildValidationPrompt(words, translationTarget));
             ensureActiveModelRecord(modelCall.modelName());
             String rawJson = extractGeminiText(modelCall.responseText());
             return parseValidationOutput(rawJson, words);
@@ -154,7 +156,16 @@ public class StoryGenerationService {
         }
     }
 
-    private String buildValidationPrompt(List<StoryGenerateRequest.WordItem> words) {
+    private String resolvePreferredSuggestionLanguage(String translationTarget) {
+        return switch (translationTarget) {
+            case "tr" -> "simple Turkish";
+            case "de" -> "simple German";
+            case "es" -> "simple Spanish";
+            default -> "simple English";
+        };
+    }
+
+    private String buildValidationPrompt(List<StoryGenerateRequest.WordItem> words, String translationTarget) {
         List<Map<String, String>> payload = words.stream()
                 .map(item -> {
                     Map<String, String> row = new LinkedHashMap<>();
@@ -165,6 +176,8 @@ public class StoryGenerationService {
                     return row;
                 })
                 .toList();
+
+        String preferredSuggestionLanguage = resolvePreferredSuggestionLanguage(translationTarget);
 
         return """
                 You validate meaning hints for English learning flashcards.
@@ -183,7 +196,10 @@ public class StoryGenerationService {
                 - if hint is empty, mark status "ok" with empty approvedHint and suggestedHint
                 - approvedHint is the short meaning hint that should guide story generation
                 - for suspicious items, suggestedHint should be a better short meaning
-                - suggestedHint should stay in the same language as the user's hint when you can infer it, otherwise use simple English
+                - suggestedHint must stay in the same language as the user's hint whenever possible
+                - Never rewrite a non-English hint into English if you can infer the hint language
+                - If the hint language is unclear, use %s for suggestedHint
+                - Example: word "car", hint "ahmet" -> Turkish suggestedHint "araba"
                 - reason must be short and user-friendly, maximum 8 words
 
                 Input items:
@@ -203,7 +219,7 @@ public class StoryGenerationService {
                     }
                   ]
                 }
-                """.formatted(safeJson(payload));
+                """.formatted(preferredSuggestionLanguage, safeJson(payload));
     }
 
     private StoryWordValidationResponse fallbackValidation(List<StoryGenerateRequest.WordItem> words) {
@@ -284,10 +300,20 @@ public class StoryGenerationService {
             default -> "- target_word must be the natural Turkish equivalent for the exact sense used";
         };
 
+        String targetWordPrecisionRule = translationTarget.equals("none")
+                ? ""
+                : """
+                - target_word must exactly match the visible word or phrase that actually appears in the translated story
+                - Do not return a dictionary lemma, normalized form, or alternative synonym if the translated story uses different wording
+                - If meaning_hint is already written in the same language as the translation target and it is a natural translation for the chosen sense, prefer reusing that exact wording in the translated story
+                """;
+
         return """
                 You are an English learning assistant.
 
                 Write a story and return only valid JSON.
+
+                Translation target: %s
 
                 Constraints:
                 - CEFR level: %s
@@ -313,11 +339,13 @@ public class StoryGenerationService {
                 - word_mappings must contain exactly %s items in the same order as the required word entries
                 - In word_mappings, source_word must exactly match the corresponding required source word
                 - In word_mappings, source_hint must be the hint actually used, or empty if no hint was used
+                %s
                 - In word_mappings, hint_status must be one of: used, ignored, not_provided
                 %s
                 - Never URL-encode output text (do not use %%20, %%0A, or + for spaces)
                 - Return valid JSON only
                 """.formatted(
+                translationTarget,
                 request.getLevel(),
                 request.getTopic(),
                 request.getSentiment(),
@@ -326,6 +354,7 @@ public class StoryGenerationService {
                 outputSchema,
                 request.getLevel(),
                 requiredWordCount,
+                targetWordPrecisionRule,
                 targetLanguageRule
         );
     }
@@ -512,6 +541,9 @@ public class StoryGenerationService {
                     sourceHint = originalHint;
                 }
                 String targetWord = clean(nodeText(mappingNode, "target_word", "targetWord", "translated_word", "translatedWord"));
+                if (!translatedStory.isBlank() && !containsWholePhrase(translatedStory, targetWord) && containsWholePhrase(translatedStory, sourceHint)) {
+                    targetWord = sourceHint;
+                }
                 String hintStatus = sanitizeHintStatus(nodeText(mappingNode, "hint_status", "hintStatus"), sourceHint);
 
                 wordMappings.add(StoryGenerateResponse.WordMapping.builder()
@@ -586,6 +618,15 @@ public class StoryGenerationService {
             return premiumDailyStoryLimit;
         }
         return freeDailyStoryLimit;
+    }
+
+    private boolean containsWholePhrase(String text, String phrase) {
+        String normalizedText = clean(text);
+        String normalizedPhrase = clean(phrase);
+        if (normalizedText.isBlank() || normalizedPhrase.isBlank()) return false;
+
+        String regex = "(?iu)(?<![\\p{L}\\p{N}])" + Pattern.quote(normalizedPhrase) + "(?![\\p{L}\\p{N}])";
+        return Pattern.compile(regex).matcher(normalizedText).find();
     }
 
     private void ensureActiveModelRecord(String modelName) {
