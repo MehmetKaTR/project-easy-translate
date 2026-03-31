@@ -34,6 +34,18 @@ public class Story {
     @Field("turkish_translation")
     private String turkishTranslation;
 
+    @Field("translated_story")
+    private String translatedStory;
+
+    @Field("translated_language")
+    private String translatedLanguage;
+
+    @Field("translated_words_csv")
+    private String translatedWordsCsv;
+
+    @Field("word_mappings_json")
+    private String wordMappingsJson;
+
     private String language;
 
     @Builder.Default

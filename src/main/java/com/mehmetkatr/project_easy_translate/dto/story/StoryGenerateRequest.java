@@ -31,7 +31,13 @@ public class StoryGenerateRequest {
     @Getter
     @Setter
     public static class WordItem {
+        private String clientId;
+
         @NotBlank
         private String word;
+
+        private String translated;
+
+        private String languageCode;
     }
 }

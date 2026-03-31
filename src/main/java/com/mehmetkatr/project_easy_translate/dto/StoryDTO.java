@@ -19,6 +19,10 @@ public class StoryDTO {
     private String promptWords;
     private String content;
     private String turkishTranslation;
+    private String translatedStory;
+    private String translatedLanguage;
+    private String translatedWordsCsv;
+    private String wordMappingsJson;
     private String language;
     private Boolean starred; // nullable: update requestte gelmeyebilir
     private Date createdAt;
@@ -31,6 +35,16 @@ public class StoryDTO {
         this.promptWords = story.getPromptWords();
         this.content = story.getContent();
         this.turkishTranslation = story.getTurkishTranslation();
+        this.translatedStory =
+                story.getTranslatedStory() != null && !story.getTranslatedStory().isBlank()
+                        ? story.getTranslatedStory()
+                        : story.getTurkishTranslation();
+        this.translatedLanguage =
+                story.getTranslatedLanguage() != null && !story.getTranslatedLanguage().isBlank()
+                        ? story.getTranslatedLanguage()
+                        : (story.getTurkishTranslation() != null && !story.getTurkishTranslation().isBlank() ? "tr" : "");
+        this.translatedWordsCsv = story.getTranslatedWordsCsv();
+        this.wordMappingsJson = story.getWordMappingsJson();
         this.language = story.getLanguage();
         this.starred = story.isStarred();
         this.createdAt = story.getCreatedAt();

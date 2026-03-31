@@ -19,6 +19,31 @@ public class StoryService {
 
     private final StoryRepository storyRepository;
 
+    private String clean(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isBlank() ? null : trimmed;
+    }
+
+    private String resolveTranslatedStory(StoryDTO dto) {
+        String translatedStory = clean(dto.getTranslatedStory());
+        if (translatedStory != null) return translatedStory;
+        return clean(dto.getTurkishTranslation());
+    }
+
+    private String resolveTranslatedLanguage(StoryDTO dto) {
+        String translatedLanguage = clean(dto.getTranslatedLanguage());
+        if (translatedLanguage != null) return translatedLanguage.toLowerCase();
+        return clean(dto.getTurkishTranslation()) != null ? "tr" : null;
+    }
+
+    private String resolveTurkishTranslation(StoryDTO dto, String translatedStory, String translatedLanguage) {
+        String turkishTranslation = clean(dto.getTurkishTranslation());
+        if (turkishTranslation != null) return turkishTranslation;
+        if ("tr".equalsIgnoreCase(translatedLanguage)) return translatedStory;
+        return null;
+    }
+
     public Story addStory(Long userId, StoryDTO dto) {
         Date now = new Date();
 
@@ -26,13 +51,20 @@ public class StoryService {
                 (dto.getStoryName() == null || dto.getStoryName().isBlank())
                         ? "Story " + now.getTime()
                         : dto.getStoryName().trim();
+        String translatedStory = resolveTranslatedStory(dto);
+        String translatedLanguage = resolveTranslatedLanguage(dto);
+        String turkishTranslation = resolveTurkishTranslation(dto, translatedStory, translatedLanguage);
 
         Story story = Story.builder()
                 .userId(userId)
                 .storyName(finalStoryName)
                 .promptWords(dto.getPromptWords())
                 .content(dto.getContent())
-                .turkishTranslation(dto.getTurkishTranslation())
+                .turkishTranslation(turkishTranslation)
+                .translatedStory(translatedStory)
+                .translatedLanguage(translatedLanguage)
+                .translatedWordsCsv(clean(dto.getTranslatedWordsCsv()))
+                .wordMappingsJson(clean(dto.getWordMappingsJson()))
                 .language(dto.getLanguage() == null ? "English" : dto.getLanguage())
                 .starred(Boolean.TRUE.equals(dto.getStarred())) // default false
                 .createdAt(now)
@@ -106,6 +138,10 @@ public class StoryService {
     public Story updateStory(Long userId, String storyId, StoryDTO dto) {
         return storyRepository.findByIdAndUserId(storyId, userId)
                 .map(story -> {
+                    String translatedStory = resolveTranslatedStory(dto);
+                    String translatedLanguage = resolveTranslatedLanguage(dto);
+                    String turkishTranslation = resolveTurkishTranslation(dto, translatedStory, translatedLanguage);
+
                     if (dto.getStoryName() != null && !dto.getStoryName().isBlank()) {
                         story.setStoryName(dto.getStoryName().trim());
                     }
@@ -115,8 +151,20 @@ public class StoryService {
                     if (dto.getContent() != null) {
                         story.setContent(dto.getContent());
                     }
-                    if (dto.getTurkishTranslation() != null) {
-                        story.setTurkishTranslation(dto.getTurkishTranslation());
+                    if (dto.getTurkishTranslation() != null || translatedStory != null || translatedLanguage != null) {
+                        story.setTurkishTranslation(turkishTranslation);
+                    }
+                    if (translatedStory != null) {
+                        story.setTranslatedStory(translatedStory);
+                    }
+                    if (translatedLanguage != null) {
+                        story.setTranslatedLanguage(translatedLanguage);
+                    }
+                    if (dto.getTranslatedWordsCsv() != null) {
+                        story.setTranslatedWordsCsv(clean(dto.getTranslatedWordsCsv()));
+                    }
+                    if (dto.getWordMappingsJson() != null) {
+                        story.setWordMappingsJson(clean(dto.getWordMappingsJson()));
                     }
                     if (dto.getLanguage() != null && !dto.getLanguage().isBlank()) {
                         story.setLanguage(dto.getLanguage());

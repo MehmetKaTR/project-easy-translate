@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateRequest;
 import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateResponse;
 import com.mehmetkatr.project_easy_translate.dto.story.StoryLimitStatusResponse;
+import com.mehmetkatr.project_easy_translate.dto.story.StoryWordValidationRequest;
+import com.mehmetkatr.project_easy_translate.dto.story.StoryWordValidationResponse;
 import com.mehmetkatr.project_easy_translate.entity.LlmModel;
 import com.mehmetkatr.project_easy_translate.entity.TokenUsageLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
@@ -20,9 +22,12 @@ import org.springframework.web.client.RestClient;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -62,36 +67,15 @@ public class StoryGenerationService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         validateDailyStoryGenerationLimit(user);
 
-        String selectedModel = null;
         String translationTarget = normalizeTranslationTarget(request.getTranslationTarget());
         String prompt = buildPrompt(request, translationTarget);
-        String responseText = null;
+        ModelCallResult modelCall = callGeminiWithFallback(prompt);
 
-        HttpClientErrorException.TooManyRequests lastQuotaError = null;
-        for (String modelCandidate : resolveModelCandidates()) {
-            try {
-                responseText = callGemini(prompt, modelCandidate);
-                selectedModel = modelCandidate;
-                break;
-            } catch (HttpClientErrorException.NotFound ex) {
-                // Try next model candidate
-            } catch (HttpClientErrorException.TooManyRequests ex) {
-                lastQuotaError = ex;
-            }
-        }
+        ensureActiveModelRecord(modelCall.modelName());
 
-        if (responseText == null || selectedModel == null) {
-            if (lastQuotaError != null) {
-                throw new IllegalArgumentException("Gemini quota exceeded for all configured models. Try again later or change model/key.");
-            }
-            throw new IllegalArgumentException("No compatible Gemini model found. Update GEMINI_MODEL/GEMINI_FALLBACK_MODELS.");
-        }
-
-        ensureActiveModelRecord(selectedModel);
-
-        String rawJson = extractGeminiText(responseText);
-        ParsedStory parsedStory = parseModelOutput(rawJson, translationTarget);
-        int tokensUsed = extractTokensUsed(responseText);
+        String rawJson = extractGeminiText(modelCall.responseText());
+        ParsedStory parsedStory = parseModelOutput(rawJson, translationTarget, sanitizeWords(request.getWords()));
+        int tokensUsed = extractTokensUsed(modelCall.responseText());
         persistTokenUsage(user, tokensUsed);
 
         return StoryGenerateResponse.builder()
@@ -101,9 +85,30 @@ public class StoryGenerationService {
                 .translatedStory(parsedStory.storyTranslated())
                 .translatedLanguage(translationTarget)
                 .translatedWordsCsv(parsedStory.translatedWordsCsv())
-                .model(selectedModel)
+                .wordMappings(parsedStory.wordMappings())
+                .model(modelCall.modelName())
                 .tokensUsed(tokensUsed)
                 .build();
+    }
+
+    public StoryWordValidationResponse validateWords(StoryWordValidationRequest request) {
+        List<StoryGenerateRequest.WordItem> words = sanitizeWords(request.getWords());
+        if (words.isEmpty()) {
+            return StoryWordValidationResponse.builder().items(List.of()).build();
+        }
+
+        if (geminiApiKey == null || geminiApiKey.isBlank()) {
+            return fallbackValidation(words);
+        }
+
+        try {
+            ModelCallResult modelCall = callGeminiWithFallback(buildValidationPrompt(words));
+            ensureActiveModelRecord(modelCall.modelName());
+            String rawJson = extractGeminiText(modelCall.responseText());
+            return parseValidationOutput(rawJson, words);
+        } catch (Exception ex) {
+            return fallbackValidation(words);
+        }
     }
 
     public StoryLimitStatusResponse getDailyLimitStatus(Long userId) {
@@ -128,38 +133,118 @@ public class StoryGenerationService {
                 .build();
     }
 
-    private String buildPrompt(StoryGenerateRequest request, String translationTarget) {
-        String words = request.getWords().stream()
-                .map(StoryGenerateRequest.WordItem::getWord)
-                .map(String::trim)
-                .filter(w -> !w.isBlank())
-                .collect(Collectors.joining(", "));
-        int requiredWordCount = request.getWords() == null ? 0 : request.getWords().size();
+    private List<StoryGenerateRequest.WordItem> sanitizeWords(List<StoryGenerateRequest.WordItem> words) {
+        if (words == null) return List.of();
+        return words.stream()
+                .filter(Objects::nonNull)
+                .filter(item -> item.getWord() != null && !item.getWord().trim().isBlank())
+                .toList();
+    }
 
+    private String clean(String value) {
+        if (value == null) return "";
+        return value.trim();
+    }
+
+    private String safeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception ex) {
+            return "[]";
+        }
+    }
+
+    private String buildValidationPrompt(List<StoryGenerateRequest.WordItem> words) {
+        List<Map<String, String>> payload = words.stream()
+                .map(item -> {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    row.put("clientId", clean(item.getClientId()));
+                    row.put("word", clean(item.getWord()));
+                    row.put("hint", clean(item.getTranslated()));
+                    row.put("languageCode", clean(item.getLanguageCode()));
+                    return row;
+                })
+                .toList();
+
+        return """
+                You validate meaning hints for English learning flashcards.
+
+                Return only valid JSON.
+
+                Each item contains:
+                - word: the required source word
+                - hint: the user's meaning hint; it may be in any language
+
+                Decision rules:
+                - status "ok" when the hint is a plausible meaning, synonym, or natural translation
+                - status "ambiguous" when the hint is still plausible but only selects one valid sense of a multi-meaning word
+                - status "suspicious" when the hint looks unrelated, nonsensical, person-name-like, or strongly conflicts with the word
+                - hints in different languages are valid if the meaning matches
+                - if hint is empty, mark status "ok" with empty approvedHint and suggestedHint
+                - approvedHint is the short meaning hint that should guide story generation
+                - for suspicious items, suggestedHint should be a better short meaning
+                - suggestedHint should stay in the same language as the user's hint when you can infer it, otherwise use simple English
+                - reason must be short and user-friendly, maximum 8 words
+
+                Input items:
+                %s
+
+                Output JSON schema:
+                {
+                  "items": [
+                    {
+                      "clientId": "same as input",
+                      "word": "same source word",
+                      "originalHint": "same original hint",
+                      "status": "ok | ambiguous | suspicious",
+                      "approvedHint": "short hint to use",
+                      "suggestedHint": "better short hint or empty",
+                      "reason": "short explanation"
+                    }
+                  ]
+                }
+                """.formatted(safeJson(payload));
+    }
+
+    private StoryWordValidationResponse fallbackValidation(List<StoryGenerateRequest.WordItem> words) {
+        return StoryWordValidationResponse.builder()
+                .items(words.stream()
+                        .map(item -> StoryWordValidationResponse.Item.builder()
+                                .clientId(clean(item.getClientId()))
+                                .word(clean(item.getWord()))
+                                .originalHint(clean(item.getTranslated()))
+                                .status("ok")
+                                .approvedHint(clean(item.getTranslated()))
+                                .suggestedHint("")
+                                .reason("")
+                                .build())
+                        .toList())
+                .build();
+    }
+
+    private String buildPrompt(StoryGenerateRequest request, String translationTarget) {
+        List<StoryGenerateRequest.WordItem> words = sanitizeWords(request.getWords());
+        int requiredWordCount = words.size();
         String translationFieldDescription = switch (translationTarget) {
             case "de" -> "\"story_de\": \"German translation of the English story\"";
             case "es" -> "\"story_es\": \"Spanish translation of the English story\"";
             case "none" -> "";
             default -> "\"story_tr\": \"Turkish translation of the English story\"";
         };
-        String translationRule = switch (translationTarget) {
-            case "de" -> "- story_de must be natural German translation";
-            case "es" -> "- story_es must be natural Spanish translation";
-            case "none" -> "";
-            default -> "- story_tr must be natural Turkish translation";
-        };
-        String translatedWordsSchema = translationTarget.equals("none")
-                ? ""
-                : "\"translated_words_csv\": \"comma-separated translated forms of required words in same order\"";
-        String translatedWordsRule = translationTarget.equals("none")
-                ? ""
-                : "- translated_words_csv must contain exactly " + requiredWordCount + " items in the same order as required words";
 
         String outputSchema = translationTarget.equals("none")
                 ? """
                 {
                   "title": "max 8 words",
-                  "story_en": "English story only"
+                  "story_en": "English story only",
+                  "word_mappings": [
+                    {
+                      "source_word": "required word exactly as given",
+                      "source_hint": "meaning hint actually used, or empty",
+                      "target_word": "",
+                      "hint_status": "used | ignored | not_provided"
+                    }
+                  ]
                 }
                 """
                 : """
@@ -167,9 +252,37 @@ public class StoryGenerationService {
                   "title": "max 8 words",
                   "story_en": "English story only",
                   %s,
-                  %s
+                  "word_mappings": [
+                    {
+                      "source_word": "required word exactly as given",
+                      "source_hint": "meaning hint actually used, or empty",
+                      "target_word": "natural translated equivalent in the target language",
+                      "hint_status": "used | ignored | not_provided"
+                    }
+                  ]
                 }
-                """.formatted(translationFieldDescription, translatedWordsSchema);
+                """.formatted(translationFieldDescription);
+
+        String requiredWordEntries = words.stream()
+                .map(item -> {
+                    String sourceWord = clean(item.getWord());
+                    String hint = clean(item.getTranslated());
+                    String languageCode = clean(item.getLanguageCode());
+                    if (!hint.isBlank()) {
+                        return "- source_word: \"%s\" | meaning_hint: \"%s\" | source_language: \"%s\""
+                                .formatted(sourceWord, hint, languageCode.isBlank() ? "EN" : languageCode);
+                    }
+                    return "- source_word: \"%s\" | meaning_hint: \"\" | source_language: \"%s\""
+                            .formatted(sourceWord, languageCode.isBlank() ? "EN" : languageCode);
+                })
+                .collect(Collectors.joining("\n"));
+
+        String targetLanguageRule = switch (translationTarget) {
+            case "de" -> "- target_word must be the natural German equivalent for the exact sense used";
+            case "es" -> "- target_word must be the natural Spanish equivalent for the exact sense used";
+            case "none" -> "- target_word must be an empty string";
+            default -> "- target_word must be the natural Turkish equivalent for the exact sense used";
+        };
 
         return """
                 You are an English learning assistant.
@@ -181,7 +294,9 @@ public class StoryGenerationService {
                 - Topic: %s
                 - Sentiment: %s
                 - Length: %s
-                - Must naturally include all words: %s
+
+                Required word entries:
+                %s
 
                 Output JSON schema:
                 %s
@@ -190,21 +305,56 @@ public class StoryGenerationService {
                 - No markdown
                 - No extra keys
                 - story_en must be CEFR %s compatible
-                - Include each required word exactly as given (same spelling, no inflection changes)
+                - story_en must be natural English
+                - Include each source_word exactly as given in story_en (same spelling, no inflection changes)
+                - meaning_hint is only a semantic hint and may be in any language
+                - If a meaning_hint is semantically valid, use the source_word in that sense
+                - If a meaning_hint is nonsensical or unrelated, ignore it and use a common natural sense
+                - word_mappings must contain exactly %s items in the same order as the required word entries
+                - In word_mappings, source_word must exactly match the corresponding required source word
+                - In word_mappings, source_hint must be the hint actually used, or empty if no hint was used
+                - In word_mappings, hint_status must be one of: used, ignored, not_provided
+                %s
                 - Never URL-encode output text (do not use %%20, %%0A, or + for spaces)
-                %s
-                %s
+                - Return valid JSON only
                 """.formatted(
                 request.getLevel(),
                 request.getTopic(),
                 request.getSentiment(),
                 request.getLength(),
-                words,
+                requiredWordEntries,
                 outputSchema,
                 request.getLevel(),
-                translationRule,
-                translatedWordsRule
+                requiredWordCount,
+                targetLanguageRule
         );
+    }
+
+    private ModelCallResult callGeminiWithFallback(String prompt) {
+        String responseText = null;
+        String selectedModel = null;
+        HttpClientErrorException.TooManyRequests lastQuotaError = null;
+
+        for (String modelCandidate : resolveModelCandidates()) {
+            try {
+                responseText = callGemini(prompt, modelCandidate);
+                selectedModel = modelCandidate;
+                break;
+            } catch (HttpClientErrorException.NotFound ex) {
+                // Try next model candidate
+            } catch (HttpClientErrorException.TooManyRequests ex) {
+                lastQuotaError = ex;
+            }
+        }
+
+        if (responseText == null || selectedModel == null) {
+            if (lastQuotaError != null) {
+                throw new IllegalArgumentException("Gemini quota exceeded for all configured models. Try again later or change model/key.");
+            }
+            throw new IllegalArgumentException("No compatible Gemini model found. Update GEMINI_MODEL/GEMINI_FALLBACK_MODELS.");
+        }
+
+        return new ModelCallResult(selectedModel, responseText);
     }
 
     private String callGemini(String prompt, String modelName) {
@@ -213,7 +363,7 @@ public class StoryGenerationService {
                         Map.of("parts", new Object[]{Map.of("text", prompt)})
                 },
                 "generationConfig", Map.of(
-                        "temperature", 0.7,
+                        "temperature", 0.45,
                         "responseMimeType", "application/json"
                 )
         );
@@ -249,7 +399,88 @@ public class StoryGenerationService {
         }
     }
 
-    private ParsedStory parseModelOutput(String rawJson, String translationTarget) {
+    private String nodeText(JsonNode node, String... keys) {
+        if (node == null || node.isMissingNode() || node.isNull()) return "";
+        for (String key : keys) {
+            String value = node.path(key).asText("").trim();
+            if (!value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private String sanitizeHintStatus(String value, String sourceHint) {
+        String normalized = clean(value).toLowerCase();
+        if ("used".equals(normalized) || "ignored".equals(normalized) || "not_provided".equals(normalized)) {
+            return normalized;
+        }
+        return clean(sourceHint).isBlank() ? "not_provided" : "used";
+    }
+
+    private String sanitizeValidationStatus(String value) {
+        String normalized = clean(value).toLowerCase();
+        return switch (normalized) {
+            case "ambiguous", "suspicious" -> normalized;
+            default -> "ok";
+        };
+    }
+
+    private StoryWordValidationResponse parseValidationOutput(String rawJson, List<StoryGenerateRequest.WordItem> originalWords) {
+        try {
+            JsonNode root = objectMapper.readTree(rawJson == null ? "{}" : rawJson);
+            JsonNode itemsNode = root.path("items");
+            if (!itemsNode.isArray()) {
+                return fallbackValidation(originalWords);
+            }
+
+            List<StoryWordValidationResponse.Item> items = new ArrayList<>();
+            for (int index = 0; index < originalWords.size(); index += 1) {
+                StoryGenerateRequest.WordItem original = originalWords.get(index);
+                JsonNode itemNode = index < itemsNode.size() ? itemsNode.get(index) : null;
+                String originalHint = clean(original.getTranslated());
+                String status = sanitizeValidationStatus(nodeText(itemNode, "status"));
+                String approvedHint = clean(nodeText(itemNode, "approvedHint", "approved_hint"));
+                String suggestedHint = clean(nodeText(itemNode, "suggestedHint", "suggested_hint"));
+                String reason = clean(nodeText(itemNode, "reason"));
+
+                if ("ok".equals(status) && approvedHint.isBlank()) {
+                    approvedHint = originalHint;
+                }
+                if ("ambiguous".equals(status) && approvedHint.isBlank()) {
+                    approvedHint = !originalHint.isBlank() ? originalHint : suggestedHint;
+                }
+                if ("suspicious".equals(status) && approvedHint.isBlank()) {
+                    approvedHint = suggestedHint;
+                }
+                if (reason.isBlank()) {
+                    reason = switch (status) {
+                        case "ambiguous" -> "Meaning is valid but sense-specific.";
+                        case "suspicious" -> "Meaning hint looks unrelated.";
+                        default -> "";
+                    };
+                }
+
+                items.add(StoryWordValidationResponse.Item.builder()
+                        .clientId(clean(original.getClientId()))
+                        .word(clean(original.getWord()))
+                        .originalHint(originalHint)
+                        .status(status)
+                        .approvedHint(approvedHint)
+                        .suggestedHint(suggestedHint)
+                        .reason(reason)
+                        .build());
+            }
+
+            return StoryWordValidationResponse.builder()
+                    .items(items)
+                    .build();
+        } catch (Exception ex) {
+            return fallbackValidation(originalWords);
+        }
+    }
+
+    private ParsedStory parseModelOutput(String rawJson, String translationTarget, List<StoryGenerateRequest.WordItem> requestWords) {
         try {
             JsonNode root = objectMapper.readTree(rawJson == null ? "{}" : rawJson);
             String title = root.path("title").asText("New Story").trim();
@@ -261,16 +492,48 @@ public class StoryGenerationService {
                 default -> "story_tr";
             };
             String translatedStory = translationField.isBlank() ? "" : root.path(translationField).asText("").trim();
-            String translatedWordsCsv = translationTarget.equals("none")
-                    ? ""
-                    : root.path("translated_words_csv").asText("").trim();
 
             if (storyEn.isBlank()) {
                 throw new IllegalArgumentException("Gemini returned empty story");
             }
 
+            List<StoryGenerateResponse.WordMapping> wordMappings = new ArrayList<>();
+            JsonNode mappingsNode = root.path("word_mappings");
+            for (int index = 0; index < requestWords.size(); index += 1) {
+                StoryGenerateRequest.WordItem requestWord = requestWords.get(index);
+                JsonNode mappingNode = mappingsNode.isArray() && index < mappingsNode.size() ? mappingsNode.get(index) : null;
+                String sourceWord = clean(nodeText(mappingNode, "source_word", "sourceWord", "word"));
+                if (sourceWord.isBlank()) {
+                    sourceWord = clean(requestWord.getWord());
+                }
+                String sourceHint = clean(nodeText(mappingNode, "source_hint", "sourceHint", "hint"));
+                String originalHint = clean(requestWord.getTranslated());
+                if (sourceHint.isBlank()) {
+                    sourceHint = originalHint;
+                }
+                String targetWord = clean(nodeText(mappingNode, "target_word", "targetWord", "translated_word", "translatedWord"));
+                String hintStatus = sanitizeHintStatus(nodeText(mappingNode, "hint_status", "hintStatus"), sourceHint);
+
+                wordMappings.add(StoryGenerateResponse.WordMapping.builder()
+                        .sourceWord(sourceWord)
+                        .sourceHint(sourceHint)
+                        .targetWord(targetWord)
+                        .hintStatus(hintStatus)
+                        .build());
+            }
+
+            String translatedWordsCsv = wordMappings.stream()
+                    .map(StoryGenerateResponse.WordMapping::getTargetWord)
+                    .map(this::clean)
+                    .filter(value -> !value.isBlank())
+                    .collect(Collectors.joining(","));
+
+            if (translatedWordsCsv.isBlank()) {
+                translatedWordsCsv = root.path("translated_words_csv").asText("").trim();
+            }
+
             if (title.isBlank()) title = "New Story";
-            return new ParsedStory(title, storyEn, translatedStory, translatedWordsCsv);
+            return new ParsedStory(title, storyEn, translatedStory, translatedWordsCsv, wordMappings);
         } catch (Exception ex) {
             throw new IllegalArgumentException("Gemini output is not valid JSON");
         }
@@ -345,5 +608,13 @@ public class StoryGenerationService {
         };
     }
 
-    private record ParsedStory(String title, String storyEn, String storyTranslated, String translatedWordsCsv) {}
+    private record ModelCallResult(String modelName, String responseText) {}
+
+    private record ParsedStory(
+            String title,
+            String storyEn,
+            String storyTranslated,
+            String translatedWordsCsv,
+            List<StoryGenerateResponse.WordMapping> wordMappings
+    ) {}
 }
