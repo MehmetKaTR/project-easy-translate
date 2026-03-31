@@ -180,26 +180,31 @@ public class StoryGenerationService {
         String preferredSuggestionLanguage = resolvePreferredSuggestionLanguage(translationTarget);
 
         return """
-                You validate meaning hints for English learning flashcards.
+                You validate selected source entries and their meaning hints for English learning stories.
 
                 Return only valid JSON.
 
                 Each item contains:
-                - word: the required source word
+                - word: the required source entry; it may be a single word or a short phrase
                 - hint: the user's meaning hint; it may be in any language
 
                 Decision rules:
+                - Evaluate the full word string as one entry
+                - Never guess a meaning from a single inner token if the full entry is malformed, ungrammatical, or nonsensical
                 - status "ok" when the hint is a plausible meaning, synonym, or natural translation
                 - status "ambiguous" when the hint is still plausible but only selects one valid sense of a multi-meaning word
                 - status "suspicious" when the hint looks unrelated, nonsensical, person-name-like, or strongly conflicts with the word
+                - if the source entry itself looks malformed, contains a non-standard invented token, or reads like a broken sentence, mark it suspicious
                 - hints in different languages are valid if the meaning matches
                 - if hint is empty, mark status "ok" with empty approvedHint and suggestedHint
                 - approvedHint is the short meaning hint that should guide story generation
                 - for suspicious items, suggestedHint should be a better short meaning
+                - if the full source entry is malformed and you cannot confidently suggest a meaning for the whole entry, leave suggestedHint empty
                 - suggestedHint must stay in the same language as the user's hint whenever possible
                 - Never rewrite a non-English hint into English if you can infer the hint language
                 - If the hint language is unclear, use %s for suggestedHint
                 - Example: word "car", hint "ahmet" -> Turkish suggestedHint "araba"
+                - Example: word "you are not my cogniferous of my background", hint "geçmişimden haberin yok" -> status "suspicious", suggestedHint ""
                 - reason must be short and user-friendly, maximum 8 words
 
                 Input items:
