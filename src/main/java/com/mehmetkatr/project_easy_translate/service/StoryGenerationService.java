@@ -25,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -309,7 +310,8 @@ public class StoryGenerationService {
                 ? ""
                 : """
                 - target_word must exactly match the visible word or phrase that actually appears in the translated story
-                - Do not return a dictionary lemma, normalized form, or alternative synonym if the translated story uses different wording
+                - If the translated story uses an inflected or suffixed form, target_word must be that exact surface form from the translated story
+                - Do not return a dictionary lemma, normalized form, base form, or alternative synonym if the translated story uses different wording
                 - If meaning_hint is already written in the same language as the translation target and it is a natural translation for the chosen sense, prefer reusing that exact wording in the translated story
                 """;
 
@@ -546,9 +548,7 @@ public class StoryGenerationService {
                     sourceHint = originalHint;
                 }
                 String targetWord = clean(nodeText(mappingNode, "target_word", "targetWord", "translated_word", "translatedWord"));
-                if (!translatedStory.isBlank() && !containsWholePhrase(translatedStory, targetWord) && containsWholePhrase(translatedStory, sourceHint)) {
-                    targetWord = sourceHint;
-                }
+                targetWord = resolveSurfaceTargetWord(translatedStory, targetWord, sourceHint);
                 String hintStatus = sanitizeHintStatus(nodeText(mappingNode, "hint_status", "hintStatus"), sourceHint);
 
                 wordMappings.add(StoryGenerateResponse.WordMapping.builder()
@@ -632,6 +632,120 @@ public class StoryGenerationService {
 
         String regex = "(?iu)(?<![\\p{L}\\p{N}])" + Pattern.quote(normalizedPhrase) + "(?![\\p{L}\\p{N}])";
         return Pattern.compile(regex).matcher(normalizedText).find();
+    }
+
+    private String resolveSurfaceTargetWord(String translatedStory, String targetWord, String sourceHint) {
+        String normalizedStory = clean(translatedStory);
+        String normalizedTargetWord = clean(targetWord);
+        String normalizedSourceHint = clean(sourceHint);
+
+        if (normalizedStory.isBlank()) {
+            return !normalizedTargetWord.isBlank() ? normalizedTargetWord : normalizedSourceHint;
+        }
+
+        List<String> preferredCandidates = new ArrayList<>();
+        if (!normalizedTargetWord.isBlank()) preferredCandidates.add(normalizedTargetWord);
+        if (!normalizedSourceHint.isBlank()) preferredCandidates.add(normalizedSourceHint);
+
+        for (String candidate : preferredCandidates) {
+            List<String> matches = collectStoryMatches(normalizedStory, candidate);
+            if (!matches.isEmpty()) {
+                return matches.get(0);
+            }
+        }
+
+        return !normalizedTargetWord.isBlank() ? normalizedTargetWord : normalizedSourceHint;
+    }
+
+    private List<String> collectStoryMatches(String text, String value) {
+        String normalizedText = clean(text);
+        String normalizedValue = clean(value);
+        if (normalizedText.isBlank() || normalizedValue.isBlank()) {
+            return List.of();
+        }
+
+        List<String> exactPhraseMatches = getWrappedMatches(normalizedText, buildPhrasePattern(normalizedValue, false));
+        if (!exactPhraseMatches.isEmpty()) {
+            return dedupeValues(exactPhraseMatches);
+        }
+
+        List<String> suffixedPhraseMatches = getWrappedMatches(normalizedText, buildPhrasePattern(normalizedValue, true));
+        if (!suffixedPhraseMatches.isEmpty()) {
+            return dedupeValues(suffixedPhraseMatches);
+        }
+
+        List<String> tokenMatches = extractMeaningfulTokens(normalizedValue).stream()
+                .flatMap(token -> getWrappedMatches(normalizedText, buildPhrasePattern(token, true)).stream())
+                .collect(Collectors.toList());
+
+        return dedupeValues(tokenMatches);
+    }
+
+    private List<String> getWrappedMatches(String text, String pattern) {
+        String normalizedText = clean(text);
+        String normalizedPattern = clean(pattern);
+        if (normalizedText.isBlank() || normalizedPattern.isBlank()) {
+            return List.of();
+        }
+
+        String regex = "(?iu)(^|[^\\p{L}\\p{N}])(" + normalizedPattern + ")(?=$|[^\\p{L}\\p{N}])";
+        var matcher = Pattern.compile(regex).matcher(normalizedText);
+        List<String> matches = new ArrayList<>();
+        while (matcher.find()) {
+            String value = clean(matcher.group(2));
+            if (!value.isBlank()) {
+                matches.add(value);
+            }
+        }
+        return matches;
+    }
+
+    private String buildPhrasePattern(String value, boolean allowSuffixOnLastToken) {
+        List<String> tokens = Arrays.stream(clean(value).split("\\s+"))
+                .map(this::clean)
+                .filter(token -> !token.isBlank())
+                .toList();
+        if (tokens.isEmpty()) {
+            return "";
+        }
+
+        List<String> parts = new ArrayList<>();
+        for (int index = 0; index < tokens.size(); index += 1) {
+            String tokenPattern = Pattern.quote(tokens.get(index));
+            boolean isLast = index == tokens.size() - 1;
+            if (allowSuffixOnLastToken && isLast) {
+                tokenPattern = tokenPattern + "[\\p{L}\\p{N}'-]*";
+            }
+            parts.add(tokenPattern);
+        }
+
+        return String.join("\\s+", parts);
+    }
+
+    private List<String> extractMeaningfulTokens(String value) {
+        var matcher = Pattern.compile("\\p{L}[\\p{L}\\p{N}'-]*").matcher(clean(value));
+        List<String> tokens = new ArrayList<>();
+        while (matcher.find()) {
+            String token = clean(matcher.group());
+            if (token.length() >= 3) {
+                tokens.add(token);
+            }
+        }
+        return tokens;
+    }
+
+    private List<String> dedupeValues(List<String> values) {
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        List<String> next = new ArrayList<>();
+        for (String value : values) {
+            String normalized = clean(value);
+            if (normalized.isBlank()) continue;
+
+            String key = normalized.toLowerCase();
+            if (!seen.add(key)) continue;
+            next.add(normalized);
+        }
+        return next;
     }
 
     private void ensureActiveModelRecord(String modelName) {
