@@ -399,8 +399,7 @@ public class StoryGenerationService {
                         Map.of("parts", new Object[]{Map.of("text", prompt)})
                 },
                 "generationConfig", Map.of(
-                        "temperature", 0.45,
-                        "responseMimeType", "application/json"
+                        "temperature", 0.45
                 )
         );
 
