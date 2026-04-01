@@ -51,8 +51,22 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, authException) ->
-                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            String code = String.valueOf(request.getAttribute("authFailureCode"));
+                            String message = String.valueOf(request.getAttribute("authFailureMessage"));
+                            if ("null".equals(code) || code.isBlank()) {
+                                code = "UNAUTHORIZED";
+                            }
+                            if ("null".equals(message) || message.isBlank()) {
+                                message = "Unauthorized";
+                            }
+
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.getWriter().write(
+                                    "{\"code\":\"" + escapeJson(code) + "\",\"error\":\"" + escapeJson(message) + "\"}"
+                            );
+                        })
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -79,5 +93,11 @@ public class SecurityConfig {
                 .map(String::trim)
                 .filter(origin -> !origin.isBlank())
                 .toList();
+    }
+
+    private String escapeJson(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"");
     }
 }

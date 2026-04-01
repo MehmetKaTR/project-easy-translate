@@ -10,6 +10,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +25,7 @@ import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final List<String> EMAIL_VERIFICATION_EXEMPT_PATHS = List.of(
@@ -45,19 +47,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserRepository userRepository;
     private final AdminRepository adminRepository;
 
+    private boolean isStoryPath(String uri) {
+        return uri != null && uri.startsWith("/api/story");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String bearerToken = request.getHeader("Authorization");
+        String requestUri = request.getRequestURI();
 
         if (!StringUtils.hasText(bearerToken) || !bearerToken.startsWith("Bearer ")) {
+            if (isStoryPath(requestUri)) {
+                request.setAttribute("authFailureCode", "MISSING_AUTHORIZATION_HEADER");
+                request.setAttribute("authFailureMessage", "Authorization header is missing for story request.");
+                log.warn("Story auth rejected: missing Authorization header for {}", requestUri);
+            }
             filterChain.doFilter(request, response);
             return;
         }
 
         String jwt = bearerToken.substring(7);
         if (!tokenService.validateToken(jwt)) {
+            if (isStoryPath(requestUri)) {
+                request.setAttribute("authFailureCode", "INVALID_OR_EXPIRED_TOKEN");
+                request.setAttribute("authFailureMessage", "Access token is invalid or expired for story request.");
+                log.warn("Story auth rejected: invalid or expired JWT for {}", requestUri);
+            }
             filterChain.doFilter(request, response);
             return;
         }
@@ -69,6 +86,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if ("ROLE_USER".equals(normalizedRole)) {
             Optional<User> userOpt = userRepository.findFirstByUsernameIgnoreCase(subject);
             if (userOpt.isEmpty()) {
+                if (isStoryPath(requestUri)) {
+                    request.setAttribute("authFailureCode", "AUTHENTICATED_USER_NOT_FOUND");
+                    request.setAttribute("authFailureMessage", "Authenticated user could not be resolved for story request.");
+                    log.warn("Story auth rejected: no user found for subject '{}' on {}", subject, requestUri);
+                }
                 filterChain.doFilter(request, response);
                 return;
             }
