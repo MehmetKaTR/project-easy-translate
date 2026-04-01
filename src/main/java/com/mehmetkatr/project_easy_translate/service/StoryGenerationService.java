@@ -625,15 +625,6 @@ public class StoryGenerationService {
         return freeDailyStoryLimit;
     }
 
-    private boolean containsWholePhrase(String text, String phrase) {
-        String normalizedText = clean(text);
-        String normalizedPhrase = clean(phrase);
-        if (normalizedText.isBlank() || normalizedPhrase.isBlank()) return false;
-
-        String regex = "(?iu)(?<![\\p{L}\\p{N}])" + Pattern.quote(normalizedPhrase) + "(?![\\p{L}\\p{N}])";
-        return Pattern.compile(regex).matcher(normalizedText).find();
-    }
-
     private String resolveSurfaceTargetWord(String translatedStory, String targetWord, String sourceHint) {
         String normalizedStory = clean(translatedStory);
         String normalizedTargetWord = clean(targetWord);
