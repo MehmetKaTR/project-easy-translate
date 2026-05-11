@@ -71,7 +71,7 @@ public class StoryGenerationService {
 
         String translationTarget = normalizeTranslationTarget(request.getTranslationTarget());
         String prompt = buildPrompt(request, translationTarget);
-        ModelCallResult modelCall = callGeminiWithFallback(prompt);
+        ModelCallResult modelCall = callGeminiWithFallback(prompt, 0.45);
 
         ensureActiveModelRecord(modelCall.modelName());
 
@@ -100,17 +100,17 @@ public class StoryGenerationService {
         }
 
         if (geminiApiKey == null || geminiApiKey.isBlank()) {
-            return fallbackValidation(words);
+            throw new IllegalArgumentException("Story meaning review is not configured right now.");
         }
 
         try {
             String translationTarget = normalizeTranslationTarget(request.getTranslationTarget());
-            ModelCallResult modelCall = callGeminiWithFallback(buildValidationPrompt(words, translationTarget));
+            ModelCallResult modelCall = callGeminiWithFallback(buildValidationPrompt(words, translationTarget), 0.1);
             ensureActiveModelRecord(modelCall.modelName());
             String rawJson = extractGeminiText(modelCall.responseText());
             return parseValidationOutput(rawJson, words);
         } catch (Exception ex) {
-            return fallbackValidation(words);
+            throw new IllegalArgumentException("Story meaning review is temporarily unavailable. Please try again.");
         }
     }
 
@@ -204,7 +204,8 @@ public class StoryGenerationService {
                 - suggestedHint must stay in the same language as the user's hint whenever possible
                 - Never rewrite a non-English hint into English if you can infer the hint language
                 - If the hint language is unclear, use %s for suggestedHint
-                - Example: word "car", hint "ahmet" -> Turkish suggestedHint "araba"
+                - Example: word "car", hint "kamyon" -> Turkish suggestedHint "araba"
+                - Example: word "car", hint "elma" -> status "suspicious"
                 - Example: word "you are not my cogniferous of my background", hint "geçmişimden haberin yok" -> status "suspicious", suggestedHint ""
                 - reason must be short and user-friendly, maximum 8 words
 
@@ -366,14 +367,14 @@ public class StoryGenerationService {
         );
     }
 
-    private ModelCallResult callGeminiWithFallback(String prompt) {
+    private ModelCallResult callGeminiWithFallback(String prompt, double temperature) {
         String responseText = null;
         String selectedModel = null;
         HttpClientErrorException.TooManyRequests lastQuotaError = null;
 
         for (String modelCandidate : resolveModelCandidates()) {
             try {
-                responseText = callGemini(prompt, modelCandidate);
+                responseText = callGemini(prompt, modelCandidate, temperature);
                 selectedModel = modelCandidate;
                 break;
             } catch (HttpClientErrorException.NotFound ex) {
@@ -393,13 +394,13 @@ public class StoryGenerationService {
         return new ModelCallResult(selectedModel, responseText);
     }
 
-    private String callGemini(String prompt, String modelName) {
+    private String callGemini(String prompt, String modelName, double temperature) {
         Map<String, Object> payload = Map.of(
                 "contents", new Object[]{
                         Map.of("parts", new Object[]{Map.of("text", prompt)})
                 },
                 "generationConfig", Map.of(
-                        "temperature", 0.45
+                        "temperature", temperature
                 )
         );
 
@@ -463,10 +464,10 @@ public class StoryGenerationService {
 
     private StoryWordValidationResponse parseValidationOutput(String rawJson, List<StoryGenerateRequest.WordItem> originalWords) {
         try {
-            JsonNode root = objectMapper.readTree(rawJson == null ? "{}" : rawJson);
+            JsonNode root = objectMapper.readTree(extractJsonPayload(rawJson));
             JsonNode itemsNode = root.path("items");
             if (!itemsNode.isArray()) {
-                return fallbackValidation(originalWords);
+                throw new IllegalArgumentException("Gemini validation output is missing items");
             }
 
             List<StoryWordValidationResponse.Item> items = new ArrayList<>();
@@ -511,8 +512,34 @@ public class StoryGenerationService {
                     .items(items)
                     .build();
         } catch (Exception ex) {
-            return fallbackValidation(originalWords);
+            throw new IllegalArgumentException("Gemini validation output is not valid JSON");
         }
+    }
+
+    private String extractJsonPayload(String rawText) {
+        String value = clean(rawText);
+        if (value.isBlank()) {
+            return "{}";
+        }
+
+        if (value.startsWith("```")) {
+            value = value.replaceFirst("^```(?:json)?\\s*", "");
+            value = value.replaceFirst("\\s*```$", "");
+        }
+
+        int objectStart = value.indexOf('{');
+        int objectEnd = value.lastIndexOf('}');
+        if (objectStart >= 0 && objectEnd > objectStart) {
+            return value.substring(objectStart, objectEnd + 1);
+        }
+
+        int arrayStart = value.indexOf('[');
+        int arrayEnd = value.lastIndexOf(']');
+        if (arrayStart >= 0 && arrayEnd > arrayStart) {
+            return value.substring(arrayStart, arrayEnd + 1);
+        }
+
+        return value;
     }
 
     private ParsedStory parseModelOutput(String rawJson, String translationTarget, List<StoryGenerateRequest.WordItem> requestWords) {
