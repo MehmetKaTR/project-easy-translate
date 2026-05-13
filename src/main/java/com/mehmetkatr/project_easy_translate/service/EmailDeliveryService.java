@@ -8,6 +8,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
@@ -69,6 +70,15 @@ public class EmailDeliveryService {
             }
             sendWithSmtp(to, subject, body);
         } catch (Exception exception) {
+            log.error(
+                    "{} mail delivery failed. provider={}, to={}, from={}, reason={}",
+                    flow,
+                    mailProvider,
+                    to,
+                    fromAddress,
+                    summarizeException(exception),
+                    exception
+            );
             throw new MailDeliveryException("Could not send verification/reset email. Please try again.", exception);
         }
     }
@@ -94,12 +104,34 @@ public class EmailDeliveryService {
                 "text", body
         );
 
-        restClient.post()
-                .uri(resendBaseUrl + "/emails")
-                .header("Authorization", "Bearer " + resendApiKey)
-                .header("Content-Type", "application/json")
-                .body(payload)
-                .retrieve()
-                .toBodilessEntity();
+        try {
+            restClient.post()
+                    .uri(resendBaseUrl + "/emails")
+                    .header("Authorization", "Bearer " + resendApiKey)
+                    .header("Content-Type", "application/json")
+                    .body(payload)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException exception) {
+            String bodySnippet = exception.getResponseBodyAsString();
+            if (bodySnippet != null && bodySnippet.length() > 400) {
+                bodySnippet = bodySnippet.substring(0, 400) + "...";
+            }
+            throw new MailDeliveryException(
+                    "Resend API error: HTTP " + exception.getRawStatusCode() + (bodySnippet == null || bodySnippet.isBlank() ? "" : " " + bodySnippet),
+                    exception
+            );
+        }
+    }
+
+    private String summarizeException(Exception exception) {
+        if (exception == null) {
+            return "unknown";
+        }
+        String message = exception.getMessage();
+        if (message == null || message.isBlank()) {
+            return exception.getClass().getSimpleName();
+        }
+        return message.length() > 300 ? message.substring(0, 300) + "..." : message;
     }
 }

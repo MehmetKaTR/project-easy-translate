@@ -1,0 +1,94 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: talemind_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_PORT: 8080
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-project_easy_translate}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: ${MYSQL_USER:-app_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-app_password}
+      MONGO_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:-root}@mongodb:27017/${MONGO_INITDB_DATABASE:-project_easy_translate}?authSource=admin
+      MONGO_DATABASE: ${MONGO_INITDB_DATABASE:-project_easy_translate}
+      JWT_SECRET: ${DOCKER_JWT_SECRET:-ChangeThisDockerLocalSecretKeyAtLeast32Chars!!}
+      JWT_EXPIRATION_MS: ${DOCKER_JWT_EXPIRATION_MS:-3600000}
+      MAIL_ENABLED: ${DOCKER_MAIL_ENABLED:-false}
+      MAIL_PROVIDER: ${DOCKER_MAIL_PROVIDER:-resend}
+      MAIL_FROM: ${DOCKER_MAIL_FROM:-onboarding@resend.dev}
+      RESEND_API_KEY: ${DOCKER_RESEND_API_KEY:-}
+      RESEND_BASE_URL: ${DOCKER_RESEND_BASE_URL:-https://api.resend.com}
+      MAIL_HOST: ${DOCKER_MAIL_HOST:-}
+      MAIL_PORT: ${DOCKER_MAIL_PORT:-587}
+      MAIL_USERNAME: ${DOCKER_MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${DOCKER_MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${DOCKER_MAIL_SMTP_AUTH:-true}
+      MAIL_SMTP_STARTTLS: ${DOCKER_MAIL_SMTP_STARTTLS:-true}
+      ALLOWED_ORIGINS: ${DOCKER_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:8081}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 70s
+    networks:
+      - talemind_net
+
+  mysql:
+    image: mysql:8.4
+    container_name: talemind_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-project_easy_translate}
+      MYSQL_USER: ${MYSQL_USER:-app_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-app_password}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks:
+      - talemind_net
+
+  mongodb:
+    image: mongo:7.0
+    container_name: talemind_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-root}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-project_easy_translate}
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username $${MONGO_INITDB_ROOT_USERNAME} --password $${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - talemind_net
+
+networks:
+  talemind_net:
+
+volumes:
+  mysql_data:
+  mongo_data:
