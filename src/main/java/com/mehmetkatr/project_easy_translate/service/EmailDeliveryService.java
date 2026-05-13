@@ -4,8 +4,10 @@ import com.mehmetkatr.project_easy_translate.exception.MailDeliveryException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -40,13 +42,26 @@ public class EmailDeliveryService {
     @Value("${app.resend.base-url:https://api.resend.com}")
     private String resendBaseUrl;
 
-    private final RestClient restClient = RestClient.create();
+    @Value("${app.resend.connect-timeout-ms:5000}")
+    private int resendConnectTimeoutMs;
+
+    @Value("${app.resend.read-timeout-ms:5000}")
+    private int resendReadTimeoutMs;
 
     public void sendVerificationCode(String email, String code) {
         String subject = "TaleMind - Verify your email";
         String body = "Your TaleMind verification code: " + code + "\n\n"
                 + "This code expires in " + verifyCodeTtlMinutes + " minutes.";
         send(email, subject, body, code, "EMAIL_VERIFY");
+    }
+
+    @Async
+    public void sendVerificationCodeAsync(String email, String code) {
+        try {
+            sendVerificationCode(email, code);
+        } catch (MailDeliveryException exception) {
+            log.error("Async verification email delivery failed for {}", email, exception);
+        }
     }
 
     public void sendPasswordResetCode(String email, String code) {
@@ -94,12 +109,21 @@ public class EmailDeliveryService {
                 "text", body
         );
 
-        restClient.post()
+        buildResendClient().post()
                 .uri(resendBaseUrl + "/emails")
                 .header("Authorization", "Bearer " + resendApiKey)
                 .header("Content-Type", "application/json")
                 .body(payload)
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    private RestClient buildResendClient() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Math.max(1000, resendConnectTimeoutMs));
+        requestFactory.setReadTimeout(Math.max(1000, resendReadTimeoutMs));
+        return RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
     }
 }

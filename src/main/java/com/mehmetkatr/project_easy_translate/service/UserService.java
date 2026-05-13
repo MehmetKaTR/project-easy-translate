@@ -1,6 +1,7 @@
 package com.mehmetkatr.project_easy_translate.service;
 
 import com.mehmetkatr.project_easy_translate.dto.auth.AccountDeletionResponse;
+import com.mehmetkatr.project_easy_translate.dto.auth.AccountResponse;
 import com.mehmetkatr.project_easy_translate.dto.auth.AuthResponse;
 import com.mehmetkatr.project_easy_translate.dto.auth.UserPreferencesResponse;
 import com.mehmetkatr.project_easy_translate.entity.User;
@@ -18,6 +19,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -94,7 +97,14 @@ public class UserService {
         ensureDefaultWordList(savedUser);
 
         issueEmailVerificationCode(savedUser);
-        emailDeliveryService.sendVerificationCode(savedUser.getEmail(), savedUser.getEmailVerificationCode());
+        String verificationEmail = savedUser.getEmail();
+        String verificationCode = savedUser.getEmailVerificationCode();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                emailDeliveryService.sendVerificationCodeAsync(verificationEmail, verificationCode);
+            }
+        });
 
         return savedUser;
     }
@@ -391,6 +401,13 @@ public class UserService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public AccountResponse getAccount(String authenticatedUsername) {
+        User user = userRepository.findByUsername(authenticatedUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found"));
+        return toAccountResponse(user);
+    }
+
     public UserPreferencesResponse getPreferences(String authenticatedUsername) {
         User user = userRepository.findByUsername(authenticatedUsername)
                 .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found"));
@@ -595,6 +612,21 @@ public class UserService {
                 .userId(user.getId())
                 .preferredLanguage(user.getPreferredLanguage().name())
                 .themePreference(user.getThemePreference().name())
+                .build();
+    }
+
+    private AccountResponse toAccountResponse(User user) {
+        return AccountResponse.builder()
+                .userId(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .plan(user.getSubscriptionLevel().name())
+                .emailVerified(user.isEmailVerified())
+                .onboardingCompleted(user.isOnboardingCompleted())
+                .preferredLanguage(user.getPreferredLanguage().name())
+                .themePreference(user.getThemePreference().name())
+                .pendingDeletion(user.isPendingDeletion())
+                .scheduledDeletionAt(user.getDeletionScheduledAt() == null ? null : user.getDeletionScheduledAt().toString())
                 .build();
     }
 

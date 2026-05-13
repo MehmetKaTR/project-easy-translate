@@ -179,6 +179,13 @@ public class AuthController {
         );
     }
 
+    @GetMapping("/account")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AccountResponse> getAccount(Authentication authentication) {
+        AccountResponse response = userService.getAccount(authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/account")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<AccountDeletionResponse> requestDeleteAccount(Authentication authentication) {
