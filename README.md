@@ -1,2 +1,1 @@
-"imported logic story  cretation redesigned story illustrate for backend" fixed auth problemos
-
+AI-powered language learning platform. Users generate stories from selected words to learn vocabulary contextually. Features include subscription-based token limits, word list management, story history, and admin monitoring. Hybrid SQL + MongoDB backend, React Native frontend.
