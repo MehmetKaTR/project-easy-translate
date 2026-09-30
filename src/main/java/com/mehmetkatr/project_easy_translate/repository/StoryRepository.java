@@ -1,14 +1,13 @@
 package com.mehmetkatr.project_easy_translate.repository;
 
 import com.mehmetkatr.project_easy_translate.entity.Story;
-import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
-public interface StoryRepository extends MongoRepository<Story, String> {
+public interface StoryRepository extends JpaRepository<Story, Long> {
 
     List<Story> findByUserId(Long userId);
 
@@ -22,7 +21,7 @@ public interface StoryRepository extends MongoRepository<Story, String> {
 
     List<Story> findByCreatedAtBetween(LocalDateTime startDate, LocalDateTime endDate);
 
-    Optional<Story> findByIdAndUserId(String id, Long userId);
+    Optional<Story> findByIdAndUserId(Long id, Long userId);
 
     long deleteByUserId(Long userId);
 }

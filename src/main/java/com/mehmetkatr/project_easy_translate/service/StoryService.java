@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 
@@ -100,7 +99,7 @@ public class StoryService {
         return storyRepository.findByCreatedAtBetween(start, end);
     }
 
-    public boolean deleteStory(Long userId, String storyId) {
+    public boolean deleteStory(Long userId, Long storyId) {
         return storyRepository.findByIdAndUserId(storyId, userId)
                 .map(story -> {
                     storyRepository.delete(story);
@@ -109,7 +108,7 @@ public class StoryService {
                 .orElse(false);
     }
 
-    public Story updateStoryName(Long userId, String storyId, String storyName) {
+    public Story updateStoryName(Long userId, Long storyId, String storyName) {
         return storyRepository.findByIdAndUserId(storyId, userId)
                 .map(story -> {
                     story.setStoryName(storyName == null || storyName.isBlank() ? story.getStoryName() : storyName.trim());
@@ -118,7 +117,7 @@ public class StoryService {
                 .orElse(null);
     }
 
-    public Story updateStoryStarred(Long userId, String storyId, boolean starred) {
+    public Story updateStoryStarred(Long userId, Long storyId, boolean starred) {
         return storyRepository.findByIdAndUserId(storyId, userId)
                 .map(story -> {
                     story.setStarred(starred);
@@ -127,7 +126,7 @@ public class StoryService {
                 .orElse(null);
     }
 
-    public Story updateStory(Long userId, String storyId, StoryDTO dto) {
+    public Story updateStory(Long userId, Long storyId, StoryDTO dto) {
         return storyRepository.findByIdAndUserId(storyId, userId)
                 .map(story -> {
                     String translatedStory = resolveTranslatedStory(dto);

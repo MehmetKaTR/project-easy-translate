@@ -6,14 +6,14 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class StoryDTO {
-    private String id;
+    private Long id;
     private Long userId;
     private String storyName;
     private String promptWords;
@@ -25,8 +25,8 @@ public class StoryDTO {
     private String wordMappingsJson;
     private String language;
     private Boolean starred; // nullable: update requestte gelmeyebilir
-    private Date createdAt;
-    private Date updatedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public StoryDTO(Story story) {
         this.id = story.getId();
