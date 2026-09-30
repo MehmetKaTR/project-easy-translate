@@ -1,7 +1,10 @@
 package com.mehmetkatr.project_easy_translate.repository;
 
+import com.mehmetkatr.project_easy_translate.dto.response.WordListSummaryResponse;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -37,4 +40,14 @@ public interface WordListRepository extends JpaRepository<WordList, Long> {
     @Modifying
     @Query(value = "DELETE FROM wordlists WHERE user_id = :userId", nativeQuery = true)
     int deleteByUserIdNative(@Param("userId") Long userId);
+
+    @Query(value = """
+        SELECT new com.mehmetkatr.project_easy_translate.dto.response.WordListSummaryResponse(
+            wl.id, wl.name, wl.hexColorCode, COUNT(w))
+        FROM WordList wl LEFT JOIN wl.words w
+        WHERE wl.user.id = :userId
+        GROUP BY wl.id, wl.name, wl.hexColorCode
+        """,
+            countQuery = "SELECT COUNT(wl) FROM WordList wl WHERE wl.user.id = :userId")
+    Page<WordListSummaryResponse> findSummariesByUserId(@Param("userId") Long userId, Pageable pageable);
 }

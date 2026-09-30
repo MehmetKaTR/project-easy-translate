@@ -9,7 +9,6 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Getter
 @Setter
@@ -94,19 +93,6 @@ public class User extends BaseEntity {
     @Builder.Default
     @Column(name = "onboarding_completed", nullable = false)
     private boolean onboardingCompleted = false;
-
-    // ---------------- Relationships ----------------
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<WordList> wordLists;
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<TokenUsageLog> tokenUsageLogs;
-
-    @OneToMany(mappedBy = "targetUser", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<AdminActionLog> targetUserActions;
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ImportExportLog> importExportLogs;
 
     public enum SubscriptionLevel {
         FREE,

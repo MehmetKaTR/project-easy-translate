@@ -1,5 +1,6 @@
 package com.mehmetkatr.project_easy_translate.service;
 
+import com.mehmetkatr.project_easy_translate.dto.response.WordListSummaryResponse;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
@@ -7,6 +8,8 @@ import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -49,6 +52,10 @@ public class WordListService {
 
     public Optional<WordList> getWordListsByUserAndWordListId(User user, Long wordlistId) {
         return wordListRepository.findByUserAndId(user, wordlistId);
+    }
+
+    public Page<WordListSummaryResponse> getWordListSummaries(Long userId, Pageable pageable) {
+        return wordListRepository.findSummariesByUserId(userId, pageable);
     }
 
     public WordList createWordList(WordList wordList) {

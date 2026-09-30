@@ -2,6 +2,7 @@
 package com.mehmetkatr.project_easy_translate.controller;
 
 import com.mehmetkatr.project_easy_translate.dto.response.WordDTO;
+import com.mehmetkatr.project_easy_translate.dto.response.PagedResponse;
 import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.Word;
@@ -10,6 +11,9 @@ import com.mehmetkatr.project_easy_translate.service.WordListService;
 import com.mehmetkatr.project_easy_translate.service.WordService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,48 +34,47 @@ public class WordController {
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping("/all")
-    public ResponseEntity<List<WordDTO>> getAllWordsByUser(@RequestParam(required = false) Long userId) {
+    public ResponseEntity<PagedResponse<WordDTO>> getAllWordsByUser(@RequestParam(required = false) Long userId, @PageableDefault(size = 20, sort = "id") Pageable pageable) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-        List<WordDTO> dtoList = wordService.getAllWordsByUser(authenticatedUserId).stream().map(WordDTO::new).toList();
-        return ResponseEntity.ok(dtoList);
+        Page<WordDTO> page = wordService.getAllWordsByUser(authenticatedUserId, pageable)
+                .map(WordDTO::new);
+        return ResponseEntity.ok(PagedResponse.from(page));
     }
 
     @GetMapping("/all_words")
     @Transactional
-    public ResponseEntity<List<WordDTO>> getAllWordsByAll(@RequestParam(required = false) Long userId) {
+    public ResponseEntity<PagedResponse<WordDTO>> getAllWordsByAll(@RequestParam(required = false) Long userId, @PageableDefault(size = 20, sort = "id") Pageable pageable) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         Optional<WordList> wordListOpt = resolveAllList(authenticatedUserId);
         if (wordListOpt.isEmpty()) return ResponseEntity.notFound().build();
 
-        List<WordDTO> dtoList = wordListOpt.get().getWords().stream()
-                .sorted(Comparator.comparing(Word::getId))
-                .map(WordDTO::new)
-                .toList();
-        return ResponseEntity.ok(dtoList);
+        Page<WordDTO> page = wordService.getWordsByWordListId(wordListOpt.get().getId(), pageable).map(WordDTO::new);
+        return ResponseEntity.ok(PagedResponse.from(page));
+    }
+
+    @GetMapping("/starred")
+    public ResponseEntity<PagedResponse<WordDTO>> getStarredWords(@RequestParam(required = false) Long userId, @PageableDefault(size = 20, sort = "id") Pageable pageable) {
+        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
+        Page<WordDTO> page = wordService.getStarredWordsByUser(authenticatedUserId, pageable).map(WordDTO::new);
+        return ResponseEntity.ok(PagedResponse.from(page));
     }
 
     @GetMapping("/byWordList")
     @Transactional
-    public ResponseEntity<List<WordDTO>> getAllWordsByWordList(@RequestParam(required = false) Long userId, @RequestParam Long wordListId) {
+    public ResponseEntity<PagedResponse<WordDTO>> getAllWordsByWordList(
+            @RequestParam(required = false) Long userId,
+            @RequestParam Long wordListId,
+            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         User user = new User();
         user.setId(authenticatedUserId);
 
-        Optional<WordList> wordListOpt = wordListService.getWordListsByUserAndWordListId(user, wordListId);
-        if (wordListOpt.isEmpty()) return ResponseEntity.notFound().build();
-
-        List<WordDTO> dtoList = wordListOpt.get().getWords().stream()
-                .sorted(Comparator.comparing(Word::getId))
-                .map(WordDTO::new)
-                .toList();
-        return ResponseEntity.ok(dtoList);
-    }
-
-    @GetMapping("/starred")
-    public ResponseEntity<List<WordDTO>> getStarredWords(@RequestParam(required = false) Long userId) {
-        Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-        List<WordDTO> dtoList = wordService.getStarredWordsByUser(authenticatedUserId).stream().map(WordDTO::new).toList();
-        return ResponseEntity.ok(dtoList);
+        // sahiplik kontrolü: liste gerçekten bu kullanıcıya mı ait?
+        if (wordListService.getWordListsByUserAndWordListId(user, wordListId).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Page<WordDTO> page = wordService.getWordsByWordListId(wordListId, pageable).map(WordDTO::new);
+        return ResponseEntity.ok(PagedResponse.from(page));
     }
 
     @PutMapping("/add")

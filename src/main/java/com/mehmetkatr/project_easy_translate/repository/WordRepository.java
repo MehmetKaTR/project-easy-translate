@@ -2,6 +2,8 @@ package com.mehmetkatr.project_easy_translate.repository;
 
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
@@ -30,11 +32,19 @@ public interface WordRepository extends JpaRepository<Word, Long> {
     @Query("SELECT DISTINCT w FROM Word w JOIN w.wordLists wl WHERE wl = :wordList AND w.starred = :starred ORDER BY w.id ASC")
     List<Word> findByWordListAndStarred(@Param("wordList") WordList wordList, @Param("starred") boolean starred);
 
-    @Query("SELECT w FROM Word w WHERE w.user.id = :userId ORDER BY w.id ASC")
-    List<Word> findAllByUserId(Long userId);
+    // Sayfalı: API listeleme uçları için
+    @Query("SELECT w FROM Word w WHERE w.user.id = :userId")
+    Page<Word> findAllByUserId(@Param("userId") Long userId, Pageable pageable);
 
-    @Query("SELECT w FROM Word w WHERE w.user.id = :userId AND w.starred = true ORDER BY w.id ASC")
-    List<Word> findStarredByUserId(Long userId);
+    // Sayfasız: iç mantıkta tüm kelimelere ihtiyaç duyan yerler için (overload)
+    @Query("SELECT w FROM Word w WHERE w.user.id = :userId ORDER BY w.id ASC")
+    List<Word> findAllByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT w FROM Word w WHERE w.user.id = :userId AND w.starred = true")
+    Page<Word> findStarredByUserId(Long userId, Pageable pageable);
+
+    @Query("SELECT w FROM Word w JOIN w.wordLists wl WHERE wl.id = :wordListId")
+    Page<Word> findByWordListId(@Param("wordListId") Long wordListId, Pageable pageable);
 
     @Query("""
             SELECT w FROM Word w

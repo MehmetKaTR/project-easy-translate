@@ -5,6 +5,8 @@ import com.mehmetkatr.project_easy_translate.entity.Story;
 import com.mehmetkatr.project_easy_translate.repository.StoryRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -75,12 +77,12 @@ public class StoryService {
         return storyRepository.findAll();
     }
 
-    public List<Story> findByUserId(Long id) {
-        return storyRepository.findByUserId(id);
+    public Page<Story> findByUserId(Long id, Pageable pageable) {
+        return storyRepository.findByUserId(id, pageable);
     }
 
-    public List<Story> findStarredByUserId(Long userId) {
-        return storyRepository.findByUserIdAndStarred(userId, true);
+    public Page<Story> findStarredByUserId(Long userId, Pageable pageable) {
+        return storyRepository.findByUserIdAndStarred(userId, true, pageable);
     }
 
     public List<Story> findByPromptWord(String promptWord) {
