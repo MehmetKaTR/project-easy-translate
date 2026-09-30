@@ -15,6 +15,7 @@ import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserService {
 
     private final UserRepository userRepository;
@@ -95,6 +97,7 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
         ensureDefaultWordList(savedUser);
+        log.info("Yeni kullanici kaydi: userId={}, username={}", savedUser.getId(), savedUser.getUsername());
 
         issueEmailVerificationCode(savedUser);
         String verificationEmail = savedUser.getEmail();
@@ -163,6 +166,7 @@ public class UserService {
 
         String passwordHash = user.getPasswordHash();
         if (passwordHash == null || passwordHash.isBlank() || !passwordEncoder.matches(rawPassword, passwordHash)) {
+            log.warn("Giris basarisiz (hatali sifre): userId={}", user.getId());
             throw new AuthenticationFailedException("Invalid username or password");
         }
 
@@ -172,6 +176,7 @@ public class UserService {
 
         String token = tokenService.generateToken(user.getUsername(), "ROLE_USER");
         String refreshToken = refreshTokenService.issueRefreshToken(user, clientIp, userAgent);
+        log.info("Giris basarili: userId={}", user.getId());
         return buildAuthResponse(user, token, refreshToken);
     }
 

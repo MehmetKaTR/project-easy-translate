@@ -1,6 +1,7 @@
 package com.mehmetkatr.project_easy_translate.service;
 
 import com.mehmetkatr.project_easy_translate.exception.RateLimitExceededException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -8,6 +9,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Slf4j
 public class AuthRateLimitService {
 
     private static final class Bucket {
@@ -47,6 +49,7 @@ public class AuthRateLimitService {
         }
 
         if (retryAfterSeconds > 0) {
+            log.warn("Rate limit asildi: key={}, retryAfterSeconds={}", key, retryAfterSeconds);
             throw new RateLimitExceededException("Too many requests. Please try again later.", retryAfterSeconds);
         }
 

@@ -1,7 +1,9 @@
 package com.mehmetkatr.project_easy_translate.exception;
 
+import com.mehmetkatr.project_easy_translate.config.TraceIdFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -143,7 +145,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnexpected(Exception exception) {
-        String traceId = UUID.randomUUID().toString();
+        // İsteğin MDC traceId'sini kullan (TraceIdFilter koydu) → istemciye dönen id loglarla eşleşir.
+        String traceId = MDC.get(TraceIdFilter.TRACE_ID);
+        if (traceId == null || traceId.isBlank()) {
+            traceId = UUID.randomUUID().toString();
+        }
         log.error("Beklenmeyen hata [traceId={}]", traceId, exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "code", "INTERNAL_ERROR",
