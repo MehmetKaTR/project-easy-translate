@@ -1,7 +1,7 @@
 
 package com.mehmetkatr.project_easy_translate.controller;
 
-import com.mehmetkatr.project_easy_translate.dto.WordDTO;
+import com.mehmetkatr.project_easy_translate.dto.response.WordDTO;
 import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.Word;

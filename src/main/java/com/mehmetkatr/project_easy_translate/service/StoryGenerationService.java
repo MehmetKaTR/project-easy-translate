@@ -2,11 +2,11 @@ package com.mehmetkatr.project_easy_translate.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateRequest;
-import com.mehmetkatr.project_easy_translate.dto.story.StoryGenerateResponse;
-import com.mehmetkatr.project_easy_translate.dto.story.StoryLimitStatusResponse;
-import com.mehmetkatr.project_easy_translate.dto.story.StoryWordValidationRequest;
-import com.mehmetkatr.project_easy_translate.dto.story.StoryWordValidationResponse;
+import com.mehmetkatr.project_easy_translate.dto.request.StoryGenerateRequest;
+import com.mehmetkatr.project_easy_translate.dto.response.StoryGenerateResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.StoryLimitStatusResponse;
+import com.mehmetkatr.project_easy_translate.dto.request.StoryWordValidationRequest;
+import com.mehmetkatr.project_easy_translate.dto.response.StoryWordValidationResponse;
 import com.mehmetkatr.project_easy_translate.entity.LlmModel;
 import com.mehmetkatr.project_easy_translate.entity.TokenUsageLog;
 import com.mehmetkatr.project_easy_translate.entity.User;

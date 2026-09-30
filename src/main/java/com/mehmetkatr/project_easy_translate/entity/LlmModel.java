@@ -1,18 +1,17 @@
 package com.mehmetkatr.project_easy_translate.entity;
+import com.mehmetkatr.project_easy_translate.entity.base.BaseDocument;
 
 import jakarta.persistence.Id;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "llm_models")
-public class LlmModel {
+public class LlmModel extends BaseDocument{
 
     @Id
     private String id;

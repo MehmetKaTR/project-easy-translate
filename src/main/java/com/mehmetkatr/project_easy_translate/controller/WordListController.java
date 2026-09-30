@@ -1,6 +1,6 @@
 package com.mehmetkatr.project_easy_translate.controller;
 
-import com.mehmetkatr.project_easy_translate.dto.WordListDTO;
+import com.mehmetkatr.project_easy_translate.dto.response.WordListDTO;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;

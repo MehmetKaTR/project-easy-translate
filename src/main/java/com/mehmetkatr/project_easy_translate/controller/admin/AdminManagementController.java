@@ -1,8 +1,8 @@
 package com.mehmetkatr.project_easy_translate.controller.admin;
 
-import com.mehmetkatr.project_easy_translate.dto.admin.AdminActionLogResponse;
-import com.mehmetkatr.project_easy_translate.dto.admin.AdminUserSummaryResponse;
-import com.mehmetkatr.project_easy_translate.dto.admin.AdminUserUpdateRequest;
+import com.mehmetkatr.project_easy_translate.dto.response.AdminActionLogResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.AdminUserSummaryResponse;
+import com.mehmetkatr.project_easy_translate.dto.request.AdminUserUpdateRequest;
 import com.mehmetkatr.project_easy_translate.entity.AdminActionLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.service.AdminActionLogService;

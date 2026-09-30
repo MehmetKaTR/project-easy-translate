@@ -1,4 +1,5 @@
 package com.mehmetkatr.project_easy_translate.entity;
+import com.mehmetkatr.project_easy_translate.entity.base.BaseEntity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
@@ -9,8 +10,8 @@ import lombok.*;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-@Data
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -26,7 +27,6 @@ public class Word extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     private Long id;
 
     @NotNull

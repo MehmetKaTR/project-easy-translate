@@ -1,6 +1,6 @@
 package com.mehmetkatr.project_easy_translate.service;
 
-import com.mehmetkatr.project_easy_translate.dto.admin.AdminUserUpdateRequest;
+import com.mehmetkatr.project_easy_translate.dto.request.AdminUserUpdateRequest;
 import com.mehmetkatr.project_easy_translate.entity.Admin;
 import com.mehmetkatr.project_easy_translate.entity.AdminActionLog;
 import com.mehmetkatr.project_easy_translate.entity.User;

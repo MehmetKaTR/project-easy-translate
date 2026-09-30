@@ -1,6 +1,6 @@
 package com.mehmetkatr.project_easy_translate.controller;
 
-import com.mehmetkatr.project_easy_translate.dto.StoryDTO;
+import com.mehmetkatr.project_easy_translate.dto.response.StoryDTO;
 import com.mehmetkatr.project_easy_translate.entity.Story;
 import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.service.StoryService;
