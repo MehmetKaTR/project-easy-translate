@@ -1,52 +1,60 @@
 package com.mehmetkatr.project_easy_translate.entity;
-import com.mehmetkatr.project_easy_translate.entity.base.BaseDocument;
 
+import com.mehmetkatr.project_easy_translate.entity.base.BaseEntity;
+import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
 
-
+@Entity
+@Table(
+        name = "stories",
+        indexes = {
+                @Index(name = "idx_stories_user_id", columnList = "user_id"),
+                @Index(name = "idx_stories_starred", columnList = "starred"),
+                @Index(name = "idx_stories_created_at", columnList = "created_at")
+        }
+)
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "stories")
-public class Story extends BaseDocument{
+public class Story extends BaseEntity {
 
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Field("user_id")
+    @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Field("story_name")
+    @Column(name = "story_name")
     private String storyName;
 
-    @Field("prompt_words")
+    @Column(name = "prompt_words", columnDefinition = "TEXT")
     private String promptWords;
 
+    @Column(columnDefinition = "LONGTEXT")
     private String content;
 
-    @Field("turkish_translation")
+    @Column(name = "turkish_translation", columnDefinition = "LONGTEXT")
     private String turkishTranslation;
 
-    @Field("translated_story")
+    @Column(name = "translated_story", columnDefinition = "LONGTEXT")
     private String translatedStory;
 
-    @Field("translated_language")
+    @Column(name = "translated_language")
     private String translatedLanguage;
 
-    @Field("translated_words_csv")
+    @Column(name = "translated_words_csv", columnDefinition = "LONGTEXT")
     private String translatedWordsCsv;
 
-    @Field("word_mappings_json")
+    // JSON verisi metin olarak saklanır (LONGTEXT). İleride MySQL JSON kolonuna yükseltilebilir.
+    @Column(name = "word_mappings_json", columnDefinition = "LONGTEXT")
     private String wordMappingsJson;
 
     private String language;
 
     @Builder.Default
+    @Column(nullable = false)
     private boolean starred = false;
-
 }

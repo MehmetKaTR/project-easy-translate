@@ -52,7 +52,7 @@ public class StoryController {
     @DeleteMapping("/delete")
     public ResponseEntity<Void> deleteStory(
             @RequestParam(required = false) Long userId,
-            @RequestParam String storyId
+            @RequestParam Long storyId
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         boolean deleted = storyService.deleteStory(authenticatedUserId, storyId);
@@ -62,7 +62,7 @@ public class StoryController {
     @PutMapping("/updateName")
     public ResponseEntity<StoryDTO> updateStoryName(
             @RequestParam(required = false) Long userId,
-            @RequestParam String storyId,
+            @RequestParam Long storyId,
             @RequestBody StoryDTO dto
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
@@ -74,7 +74,7 @@ public class StoryController {
     @PutMapping("/updateStarred")
     public ResponseEntity<StoryDTO> updateStoryStarred(
             @RequestParam(required = false) Long userId,
-            @RequestParam String storyId,
+            @RequestParam Long storyId,
             @RequestParam boolean starred
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
@@ -86,7 +86,7 @@ public class StoryController {
     @PutMapping("/update")
     public ResponseEntity<StoryDTO> updateStory(
             @RequestParam(required = false) Long userId,
-            @RequestParam String storyId,
+            @RequestParam Long storyId,
             @RequestBody StoryDTO dto
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
