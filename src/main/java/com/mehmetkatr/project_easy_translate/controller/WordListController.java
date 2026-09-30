@@ -1,4 +1,5 @@
 package com.mehmetkatr.project_easy_translate.controller;
+import jakarta.validation.Valid;
 
 import com.mehmetkatr.project_easy_translate.dto.response.PagedResponse;
 import com.mehmetkatr.project_easy_translate.dto.response.WordListDTO;
@@ -36,7 +37,7 @@ public class WordListController {
     }
 
     @PostMapping("/add")
-    public ResponseEntity<WordListDTO> addWordList(@RequestParam(required = false) Long userId, @RequestBody WordListDTO dto) {
+    public ResponseEntity<WordListDTO> addWordList(@RequestParam(required = false) Long userId, @Valid @RequestBody WordListDTO dto) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
 
         User user = new User();
@@ -58,7 +59,7 @@ public class WordListController {
     public ResponseEntity<WordListDTO> updateWordList(
             @RequestParam(required = false) Long userId,
             @RequestParam Long wordListId,
-            @RequestBody WordListDTO dto) {
+            @Valid @RequestBody WordListDTO dto) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
 
         User user = new User();

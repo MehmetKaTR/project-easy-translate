@@ -1,6 +1,7 @@
 package com.mehmetkatr.project_easy_translate.dto.response;
 
 import com.mehmetkatr.project_easy_translate.entity.Story;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,14 +16,20 @@ import java.time.LocalDateTime;
 public class StoryDTO {
     private Long id;
     private Long userId;
+
+    @Size(max = 255)
     private String storyName;
+
     private String promptWords;
     private String content;
     private String turkishTranslation;
     private String translatedStory;
+    @Size(max = 50)
     private String translatedLanguage;
     private String translatedWordsCsv;
     private String wordMappingsJson;
+
+    @Size(max = 50)
     private String language;
     private Boolean starred; // nullable: update requestte gelmeyebilir
     private LocalDateTime createdAt;

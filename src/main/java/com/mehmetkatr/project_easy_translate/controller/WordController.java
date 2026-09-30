@@ -1,5 +1,6 @@
 
 package com.mehmetkatr.project_easy_translate.controller;
+import jakarta.validation.Valid;
 
 import com.mehmetkatr.project_easy_translate.dto.response.WordDTO;
 import com.mehmetkatr.project_easy_translate.dto.response.PagedResponse;
@@ -78,7 +79,7 @@ public class WordController {
     }
 
     @PutMapping("/add")
-    public ResponseEntity<WordDTO> addWord(@RequestParam(required = false) Long userId, @RequestBody WordDTO wordDTO) {
+    public ResponseEntity<WordDTO> addWord(@RequestParam(required = false) Long userId, @Valid @RequestBody WordDTO wordDTO) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         Optional<WordList> allList = resolveAllList(authenticatedUserId);
         if (allList.isEmpty()) return ResponseEntity.badRequest().build();
@@ -109,7 +110,7 @@ public class WordController {
     public ResponseEntity<WordDTO> addWordToWordList(
             @RequestParam(required = false) Long userId,
             @RequestParam long wordListId,
-            @RequestBody WordDTO wordDTO
+            @Valid @RequestBody WordDTO wordDTO
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         User user = new User();
@@ -166,7 +167,7 @@ public class WordController {
     public ResponseEntity<WordDTO> updateWord(
             @RequestParam(required = false) Long userId,
             @RequestParam Long wordId,
-            @RequestBody WordDTO wordDTO
+            @Valid @RequestBody WordDTO wordDTO
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         Optional<Word> wordOpt = wordService.getAllWordsByUser(authenticatedUserId).stream()

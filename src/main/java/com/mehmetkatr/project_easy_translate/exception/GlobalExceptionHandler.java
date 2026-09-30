@@ -1,5 +1,7 @@
 package com.mehmetkatr.project_easy_translate.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -11,9 +13,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(AuthenticationFailedException.class)
     public ResponseEntity<Map<String, Object>> handleAuthenticationFailed(AuthenticationFailedException exception) {
@@ -128,6 +133,22 @@ public class GlobalExceptionHandler {
                 "code", "VALIDATION_ERROR",
                 "error", "Validation failed",
                 "fields", fieldErrors
+        ));
+    }
+
+    /**
+     * Son çare: yukarıdaki özel handler'ların hiçbirine uymayan beklenmeyen hatalar.
+     * İç detayları (stacktrace) istemciye SIZDIRMAZ; sadece bir traceId döner.
+     * Tam hata, aynı traceId ile sunucu loguna yazılır → destek/hata ayıklama için.
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleUnexpected(Exception exception) {
+        String traceId = UUID.randomUUID().toString();
+        log.error("Beklenmeyen hata [traceId={}]", traceId, exception);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "code", "INTERNAL_ERROR",
+                "error", "Beklenmeyen bir hata oluştu. Lütfen destek ile iletişime geçin.",
+                "traceId", traceId
         ));
     }
 }
