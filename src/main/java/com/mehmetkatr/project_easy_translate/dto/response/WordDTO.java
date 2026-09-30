@@ -18,7 +18,6 @@ public class WordDTO {
     @Size(max = 255)
     private String word;
 
-    @NotBlank
     @Size(max = 255)
     private String translated;
 
