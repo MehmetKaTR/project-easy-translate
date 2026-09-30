@@ -1,7 +1,7 @@
 package com.mehmetkatr.project_easy_translate.controller;
 
-import com.mehmetkatr.project_easy_translate.dto.auth.UserPreferencesRequest;
-import com.mehmetkatr.project_easy_translate.dto.auth.UserPreferencesResponse;
+import com.mehmetkatr.project_easy_translate.dto.request.UserPreferencesRequest;
+import com.mehmetkatr.project_easy_translate.dto.response.UserPreferencesResponse;
 import com.mehmetkatr.project_easy_translate.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

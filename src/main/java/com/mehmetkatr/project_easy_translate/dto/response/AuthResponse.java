@@ -1,0 +1,22 @@
+package com.mehmetkatr.project_easy_translate.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+
+@Getter
+@Builder
+@AllArgsConstructor
+public class AuthResponse {
+    private Long userId;
+    private String username;
+    private String token;
+    private Long accessTokenExpiresInSeconds;
+    private String refreshToken;
+    private String tokenType;
+    private String plan;
+    private String preferredLanguage;
+    private String themePreference;
+    private Boolean emailVerified;
+    private Boolean onboardingCompleted;
+}

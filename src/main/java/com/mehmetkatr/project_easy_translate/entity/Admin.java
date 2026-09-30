@@ -1,4 +1,5 @@
 package com.mehmetkatr.project_easy_translate.entity;
+import com.mehmetkatr.project_easy_translate.entity.base.BaseEntity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
@@ -8,8 +9,8 @@ import lombok.*;
 
 import java.util.List;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

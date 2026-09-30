@@ -1,6 +1,6 @@
 package com.mehmetkatr.project_easy_translate.service;
 
-import com.mehmetkatr.project_easy_translate.dto.StoryDTO;
+import com.mehmetkatr.project_easy_translate.dto.response.StoryDTO;
 import com.mehmetkatr.project_easy_translate.entity.Story;
 import com.mehmetkatr.project_easy_translate.repository.StoryRepository;
 import jakarta.transaction.Transactional;
@@ -67,8 +67,6 @@ public class StoryService {
                 .wordMappingsJson(clean(dto.getWordMappingsJson()))
                 .language(dto.getLanguage() == null ? "English" : dto.getLanguage())
                 .starred(Boolean.TRUE.equals(dto.getStarred())) // default false
-                .createdAt(now)
-                .updatedAt(now)
                 .build();
 
         return storyRepository.save(story);
@@ -91,19 +89,15 @@ public class StoryService {
     }
 
     public List<Story> findByCreatedAtAfter(LocalDateTime date) {
-        Date mongoDate = Date.from(date.atZone(ZoneId.systemDefault()).toInstant());
-        return storyRepository.findByCreatedAtAfter(mongoDate);
+        return storyRepository.findByCreatedAtAfter(date);
     }
 
     public List<Story> findByCreatedAtBefore(LocalDateTime date) {
-        Date mongoDate = Date.from(date.atZone(ZoneId.systemDefault()).toInstant());
-        return storyRepository.findByCreatedAtBefore(mongoDate);
+        return storyRepository.findByCreatedAtBefore(date);
     }
 
     public List<Story> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end) {
-        Date startDate = Date.from(start.atZone(ZoneId.systemDefault()).toInstant());
-        Date endDate = Date.from(end.atZone(ZoneId.systemDefault()).toInstant());
-        return storyRepository.findByCreatedAtBetween(startDate, endDate);
+        return storyRepository.findByCreatedAtBetween(start, end);
     }
 
     public boolean deleteStory(Long userId, String storyId) {
@@ -119,7 +113,6 @@ public class StoryService {
         return storyRepository.findByIdAndUserId(storyId, userId)
                 .map(story -> {
                     story.setStoryName(storyName == null || storyName.isBlank() ? story.getStoryName() : storyName.trim());
-                    story.setUpdatedAt(new Date());
                     return storyRepository.save(story);
                 })
                 .orElse(null);
@@ -129,7 +122,6 @@ public class StoryService {
         return storyRepository.findByIdAndUserId(storyId, userId)
                 .map(story -> {
                     story.setStarred(starred);
-                    story.setUpdatedAt(new Date());
                     return storyRepository.save(story);
                 })
                 .orElse(null);
@@ -172,7 +164,6 @@ public class StoryService {
                     if (dto.getStarred() != null) {
                         story.setStarred(dto.getStarred());
                     }
-                    story.setUpdatedAt(new Date());
                     return storyRepository.save(story);
                 })
                 .orElse(null);

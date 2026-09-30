@@ -1,6 +1,7 @@
 package com.mehmetkatr.project_easy_translate.controller.auth;
 
-import com.mehmetkatr.project_easy_translate.dto.auth.*;
+import com.mehmetkatr.project_easy_translate.dto.request.*;
+import com.mehmetkatr.project_easy_translate.dto.response.*;
 import com.mehmetkatr.project_easy_translate.service.AuthRateLimitService;
 import com.mehmetkatr.project_easy_translate.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;

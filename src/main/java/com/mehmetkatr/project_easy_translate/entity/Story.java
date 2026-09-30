@@ -1,21 +1,19 @@
 package com.mehmetkatr.project_easy_translate.entity;
+import com.mehmetkatr.project_easy_translate.entity.base.BaseDocument;
 
+import lombok.*;
 import org.springframework.data.annotation.Id;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-import java.util.Date;
 
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "stories")
-public class Story {
+public class Story extends BaseDocument{
 
     @Id
     private String id;
@@ -51,9 +49,4 @@ public class Story {
     @Builder.Default
     private boolean starred = false;
 
-    @Field("created_at")
-    private Date createdAt;
-
-    @Field("updated_at")
-    private Date updatedAt;
 }

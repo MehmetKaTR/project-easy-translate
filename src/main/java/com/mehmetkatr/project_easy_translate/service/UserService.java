@@ -1,9 +1,9 @@
 package com.mehmetkatr.project_easy_translate.service;
 
-import com.mehmetkatr.project_easy_translate.dto.auth.AccountDeletionResponse;
-import com.mehmetkatr.project_easy_translate.dto.auth.AccountResponse;
-import com.mehmetkatr.project_easy_translate.dto.auth.AuthResponse;
-import com.mehmetkatr.project_easy_translate.dto.auth.UserPreferencesResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.AccountDeletionResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.AccountResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.AuthResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.UserPreferencesResponse;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import com.mehmetkatr.project_easy_translate.exception.AccountPendingDeletionException;

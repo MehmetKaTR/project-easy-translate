@@ -1,9 +1,9 @@
 package com.mehmetkatr.project_easy_translate.controller.admin;
 
-import com.mehmetkatr.project_easy_translate.dto.admin.AdminAuthResponse;
-import com.mehmetkatr.project_easy_translate.dto.admin.AdminAuthStatusResponse;
-import com.mehmetkatr.project_easy_translate.dto.admin.AdminBootstrapRequest;
-import com.mehmetkatr.project_easy_translate.dto.admin.AdminLoginRequest;
+import com.mehmetkatr.project_easy_translate.dto.response.AdminAuthResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.AdminAuthStatusResponse;
+import com.mehmetkatr.project_easy_translate.dto.request.AdminBootstrapRequest;
+import com.mehmetkatr.project_easy_translate.dto.request.AdminLoginRequest;
 import com.mehmetkatr.project_easy_translate.entity.Admin;
 import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
 import com.mehmetkatr.project_easy_translate.service.AdminService;
