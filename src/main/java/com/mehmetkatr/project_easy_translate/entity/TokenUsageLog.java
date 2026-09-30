@@ -10,7 +10,13 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "token_usage_log")
+@Table(
+        name = "token_usage_log",
+        indexes = {
+                // Günlük token limiti: WHERE user_id = ? AND created_at BETWEEN ? AND ?
+                @Index(name = "idx_token_usage_user_created", columnList = "user_id,created_at")
+        }
+)
 public class TokenUsageLog extends BaseEntity {
 
     @Id

@@ -6,7 +6,6 @@ import com.mehmetkatr.project_easy_translate.entity.AdminActionLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
 import com.mehmetkatr.project_easy_translate.repository.AdminActionLogRepository;
-import com.mehmetkatr.project_easy_translate.repository.ImportExportLogRepository;
 import com.mehmetkatr.project_easy_translate.repository.RefreshTokenRepository;
 import com.mehmetkatr.project_easy_translate.repository.StoryRepository;
 import com.mehmetkatr.project_easy_translate.repository.TokenUsageLogRepository;
@@ -38,7 +37,6 @@ public class AdminUserManagementService {
     private final WordRepository wordRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final TokenUsageLogRepository tokenUsageLogRepository;
-    private final ImportExportLogRepository importExportLogRepository;
     private final AdminActionLogRepository adminActionLogRepository;
     private final StoryRepository storyRepository;
 
@@ -156,7 +154,6 @@ public class AdminUserManagementService {
         // Delete all relational dependencies first, then remove user.
         refreshTokenRepository.deleteByUserIdNative(userId);
         tokenUsageLogRepository.deleteByUserIdNative(userId);
-        importExportLogRepository.deleteByUserIdNative(userId);
         adminActionLogRepository.deleteByTargetUserIdNative(userId);
 
         wordListRepository.deleteWordlistLinksByUserId(userId);

@@ -1,10 +1,15 @@
 package com.mehmetkatr.project_easy_translate.controller;
 
+import com.mehmetkatr.project_easy_translate.dto.response.PagedResponse;
 import com.mehmetkatr.project_easy_translate.dto.response.StoryDTO;
 import com.mehmetkatr.project_easy_translate.entity.Story;
 import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.service.StoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,24 +34,24 @@ public class StoryController {
     }
 
     @GetMapping("/all")
-    public ResponseEntity<List<StoryDTO>> findAll(@RequestParam(required = false) Long userId) {
+    public ResponseEntity<PagedResponse<StoryDTO>> findAll(@RequestParam(required = false) Long userId, @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-        List<StoryDTO> result = storyService.findByUserId(authenticatedUserId).stream().map(StoryDTO::new).toList();
-        return ResponseEntity.ok(result);
+        Page<StoryDTO> page = storyService.findByUserId(authenticatedUserId, pageable).map(StoryDTO::new);
+        return ResponseEntity.ok(PagedResponse.from(page));
     }
 
     @GetMapping("/byUser")
-    public ResponseEntity<List<StoryDTO>> findByUserId(@RequestParam(required = false) Long userId) {
+    public ResponseEntity<PagedResponse<StoryDTO>> findByUserId(@RequestParam(required = false) Long userId, @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-        List<StoryDTO> result = storyService.findByUserId(authenticatedUserId).stream().map(StoryDTO::new).toList();
-        return ResponseEntity.ok(result);
+        Page<StoryDTO> page = storyService.findByUserId(authenticatedUserId, pageable).map(StoryDTO::new);
+        return ResponseEntity.ok(PagedResponse.from(page));
     }
 
     @GetMapping("/starred")
-    public ResponseEntity<List<StoryDTO>> findStarredByUser(@RequestParam(required = false) Long userId) {
+    public ResponseEntity<PagedResponse<StoryDTO>> findStarredByUser(@RequestParam(required = false) Long userId, @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-        List<StoryDTO> result = storyService.findStarredByUserId(authenticatedUserId).stream().map(StoryDTO::new).toList();
-        return ResponseEntity.ok(result);
+        Page<StoryDTO> page = storyService.findStarredByUserId(authenticatedUserId, pageable).map(StoryDTO::new);
+        return ResponseEntity.ok(PagedResponse.from(page));
     }
 
     @DeleteMapping("/delete")

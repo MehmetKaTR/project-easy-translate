@@ -6,6 +6,8 @@ import com.mehmetkatr.project_easy_translate.repository.WordRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,12 +23,16 @@ public class WordService {
         return wordRepository.findByWordList(wordList);
     }
 
+    public Page<Word> getAllWordsByUser(Long userId, Pageable pageable) {
+        return wordRepository.findAllByUserId(userId, pageable);
+    }
+
     public List<Word> getAllWordsByUser(Long userId) {
         return wordRepository.findAllByUserId(userId);
     }
 
-    public List<Word> getStarredWordsByUser(Long userId) {
-        return wordRepository.findStarredByUserId(userId);
+    public Page<Word> getStarredWordsByUser(Long userId, Pageable pageable) {
+        return wordRepository.findStarredByUserId(userId, pageable);
     }
 
     public List<Word> getWordsByLanguageCode(String languageCode) {
@@ -43,6 +49,10 @@ public class WordService {
 
     public List<Word> getByWordListAndTranslated(WordList wordList, String translated) {
         return wordRepository.findByWordListAndTranslated(wordList, translated);
+    }
+
+    public Page<Word> getWordsByWordListId(Long wordListId, Pageable pageable) {
+        return wordRepository.findByWordListId(wordListId, pageable);
     }
 
     public List<Word> getByWordListAndStarred(WordList wordList, boolean starred) {

@@ -1,6 +1,8 @@
 package com.mehmetkatr.project_easy_translate.controller;
 
+import com.mehmetkatr.project_easy_translate.dto.response.PagedResponse;
 import com.mehmetkatr.project_easy_translate.dto.response.WordListDTO;
+import com.mehmetkatr.project_easy_translate.dto.response.WordListSummaryResponse;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
@@ -8,6 +10,9 @@ import com.mehmetkatr.project_easy_translate.security.AuthenticatedUserResolver;
 import com.mehmetkatr.project_easy_translate.service.WordListService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,16 +29,10 @@ public class WordListController {
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping("/all")
-    public ResponseEntity<List<WordListDTO>> getAllWordListsByUser(@RequestParam(required = false) Long userId) {
+    public ResponseEntity<PagedResponse<WordListSummaryResponse>> getAllWordListsByUser(@RequestParam(required = false) Long userId, @PageableDefault(size = 20, sort = "id") Pageable pageable) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
-
-        List<WordList> wordLists = wordListService.getWordListsByUser(authenticatedUserId);
-
-        List<WordListDTO> dtoList = wordLists.stream()
-                .map(WordListDTO::new)
-                .toList();
-
-        return ResponseEntity.ok(dtoList);
+        Page<WordListSummaryResponse> page = wordListService.getWordListSummaries(authenticatedUserId, pageable);
+        return ResponseEntity.ok(PagedResponse.from(page));
     }
 
     @PostMapping("/add")
