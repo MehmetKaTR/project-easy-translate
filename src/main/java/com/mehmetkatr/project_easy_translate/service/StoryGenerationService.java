@@ -13,6 +13,8 @@ import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.exception.DailyStoryLimitExceededException;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,9 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class StoryGenerationService {
+
+    // Bu sinifta yerel bir 'log' degiskeni (TokenUsageLog) oldugu icin @Slf4j yerine 'logger' kullaniyoruz.
+    private static final Logger logger = LoggerFactory.getLogger(StoryGenerationService.class);
 
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
@@ -79,6 +84,7 @@ public class StoryGenerationService {
         ParsedStory parsedStory = parseModelOutput(rawJson, translationTarget, sanitizeWords(request.getWords()));
         int tokensUsed = extractTokensUsed(modelCall.responseText());
         persistTokenUsage(user, tokensUsed);
+        logger.info("Hikaye uretildi: userId={}, model={}, tokensUsed={}", userId, modelCall.modelName(), tokensUsed);
 
         return StoryGenerateResponse.builder()
                 .title(parsedStory.title())
@@ -378,16 +384,19 @@ public class StoryGenerationService {
                 selectedModel = modelCandidate;
                 break;
             } catch (HttpClientErrorException.NotFound ex) {
-                // Try next model candidate
+                logger.warn("Gemini modeli bulunamadi, sonraki adaya geciliyor: model={}", modelCandidate);
             } catch (HttpClientErrorException.TooManyRequests ex) {
+                logger.warn("Gemini kotasi asildi, sonraki adaya geciliyor: model={}", modelCandidate);
                 lastQuotaError = ex;
             }
         }
 
         if (responseText == null || selectedModel == null) {
             if (lastQuotaError != null) {
+                logger.error("Tum Gemini modellerinde kota asildi");
                 throw new IllegalArgumentException("Gemini quota exceeded for all configured models. Try again later or change model/key.");
             }
+            logger.error("Uyumlu Gemini modeli bulunamadi: adaylar={}", resolveModelCandidates());
             throw new IllegalArgumentException("No compatible Gemini model found. Update GEMINI_MODEL/GEMINI_FALLBACK_MODELS.");
         }
 

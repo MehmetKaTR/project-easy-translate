@@ -91,3 +91,50 @@ public class Story extends BaseDocument { ... }
 
 ### Referans
 FinanceHub `entity/base/BaseEntity` elle `@PrePersist` kullanıyor; auditing bunun bir adım ilerisi (talemind artık burada önde).
+
+---
+
+## 4. `@Value` — konfigürasyonu dışarıdan okuma
+
+```java
+@Value("${app.auth.refresh-token-ttl-days:30}")
+private int refreshTokenTtlDays;
+```
+- `${...}` → `application.properties`/`.env`'den ayarı oku; `:30` → tanımlı değilse varsayılan.
+- **Neden:** davranışı kodu değiştirmeden (recompile YOK) ortam değişkeniyle ayarlarsın. Dev'de farklı, prod'da farklı; API key'ler, limitler, TTL'ler böyle yönetilir.
+
+---
+
+## 5. Auth: JWT, SHA-256, Refresh Token
+
+### Temel problem
+HTTP **stateless** — sunucu istekler arası seni hatırlamaz. Her istekte kimliğini kanıtlaman gerekir.
+- **Session (eski):** sunucu defter tutar → ölçeklenmez.
+- **JWT (modern):** sunucu imzalı kimlik kartı verir, defter tutmaz → ölçeklenir.
+
+### JWT (JSON Web Token)
+`header.payload.signature` yapısında imzalı token.
+- Payload: `{ sub: username, role, exp }`.
+- İmza = `HMAC-SHA256(header + payload, GİZLİ_ANAHTAR)`; gizli anahtar sadece sunucuda (`JWT_SECRET`).
+- Payload'ı değiştirirsen imza tutmaz → **sahtelenemez.** Sunucu her istekte imzayı yeniden hesaplayıp doğrular → **defter gerekmez** (self-contained).
+
+### SHA-256 / HMAC
+Tek yönlü özet fonksiyonu: her girdi → sabit 256-bit parmak izi; **geri dönülemez.** JWT imzasında (HMAC) ve refresh token saklamada (hash) kullanılır.
+
+### Access token neden kısa (1 saat)?
+JWT **iptal edilemez** (defter yok). Çalınırsa süresi bitene kadar geçerli → hasarı sınırlamak için **kısa ömürlü** tutulur. Kullanıcıyı yormaz çünkü refresh token arka planda yeniler.
+
+### Refresh token
+| | Access (JWT) | Refresh |
+|---|---|---|
+| Ömür | 1 saat | 30 gün |
+| Saklanır mı | Hayır (stateless) | Evet, DB'de (hash olarak) |
+| İptal | Edilemez | Edilebilir (logout) |
+| İş | kimlik kanıtı | yeni access token almak |
+
+**Mobil akış:** app iki token'ı saklar; her istekte access; 1 saat sonra 401 → app arka planda `/refresh` ile yeni access alır; kullanıcı hiçbir şey görmez, 30 gün girişsiz kullanır.
+- **DB'de HASH saklanır** (ham değil): DB sızarsa token'lar kullanılamaz.
+- **Rotation:** her yenilemede eski iptal, yeni verilir (`replacedByTokenHash` zinciri) → çalıntı token tespiti.
+
+### Şifreler
+`PasswordEncoder` (BCrypt) ile hash'lenir; ham şifre asla saklanmaz. Login'de `passwordEncoder.matches(girilen, hash)`.

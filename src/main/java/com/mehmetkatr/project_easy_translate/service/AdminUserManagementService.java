@@ -13,6 +13,7 @@ import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +27,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional
 public class AdminUserManagementService {
 
@@ -148,6 +150,7 @@ public class AdminUserManagementService {
         cleanupUserData(user.getId());
         logIfPossible(admin, null, AdminActionLog.AdminActionType.DELETE_USER);
         userRepository.delete(user);
+        log.warn("Admin kullaniciyi sildi: adminId={}, silinenUserId={}", admin == null ? null : admin.getId(), userId);
     }
 
     private void cleanupUserData(Long userId) {
