@@ -1,4 +1,5 @@
 package com.mehmetkatr.project_easy_translate.controller;
+import jakarta.validation.Valid;
 
 import com.mehmetkatr.project_easy_translate.service.TranslationSuggestionService;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +53,7 @@ public class PublicController {
 
     @PostMapping("/translate/suggest")
     public ResponseEntity<Map<String, String>> suggestTranslationPost(
-            @RequestBody TranslateSuggestRequest request
+            @Valid @RequestBody TranslateSuggestRequest request
     ) {
         String text = request == null ? "" : String.valueOf(request.text == null ? "" : request.text);
         String source = request == null ? "en" : String.valueOf(request.source == null ? "en" : request.source);

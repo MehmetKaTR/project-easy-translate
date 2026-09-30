@@ -1,4 +1,5 @@
 package com.mehmetkatr.project_easy_translate.controller;
+import jakarta.validation.Valid;
 
 import com.mehmetkatr.project_easy_translate.dto.request.UserPreferencesRequest;
 import com.mehmetkatr.project_easy_translate.dto.response.UserPreferencesResponse;
@@ -30,7 +31,7 @@ public class UserController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<UserPreferencesResponse> updatePreferences(
             Authentication authentication,
-            @RequestBody UserPreferencesRequest request
+            @Valid @RequestBody UserPreferencesRequest request
     ) {
         return ResponseEntity.ok(
                 userService.updatePreferences(

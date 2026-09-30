@@ -167,7 +167,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<GenericMessageResponse> logout(
-            @RequestBody(required = false) LogoutRequest request,
+            @Valid @RequestBody(required = false) LogoutRequest request,
             HttpServletRequest httpRequest
     ) {
         String refreshToken = request == null ? null : request.getRefreshToken();

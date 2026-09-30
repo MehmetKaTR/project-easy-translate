@@ -1,4 +1,5 @@
 package com.mehmetkatr.project_easy_translate.controller;
+import jakarta.validation.Valid;
 
 import com.mehmetkatr.project_easy_translate.dto.response.PagedResponse;
 import com.mehmetkatr.project_easy_translate.dto.response.StoryDTO;
@@ -26,7 +27,7 @@ public class StoryController {
     @PostMapping("/add")
     public ResponseEntity<StoryDTO> addStory(
             @RequestParam(required = false) Long userId,
-            @RequestBody StoryDTO dto
+            @Valid @RequestBody StoryDTO dto
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         Story saved = storyService.addStory(authenticatedUserId, dto);
@@ -68,7 +69,7 @@ public class StoryController {
     public ResponseEntity<StoryDTO> updateStoryName(
             @RequestParam(required = false) Long userId,
             @RequestParam Long storyId,
-            @RequestBody StoryDTO dto
+            @Valid @RequestBody StoryDTO dto
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         Story updated = storyService.updateStoryName(authenticatedUserId, storyId, dto.getStoryName());
@@ -92,7 +93,7 @@ public class StoryController {
     public ResponseEntity<StoryDTO> updateStory(
             @RequestParam(required = false) Long userId,
             @RequestParam Long storyId,
-            @RequestBody StoryDTO dto
+            @Valid @RequestBody StoryDTO dto
     ) {
         Long authenticatedUserId = authenticatedUserResolver.resolveUserId(userId);
         Story updated = storyService.updateStory(authenticatedUserId, storyId, dto);

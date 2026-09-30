@@ -2,6 +2,8 @@ package com.mehmetkatr.project_easy_translate.dto.response;
 
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -11,9 +13,18 @@ import lombok.Setter;
 @NoArgsConstructor
 public class WordDTO {
     private Long id;
+
+    @NotBlank
+    @Size(max = 255)
     private String word;
+
+    @NotBlank
+    @Size(max = 255)
     private String translated;
+
+    @Size(max = 10)
     private String languageCode;
+
     private Long wordListId;
     private Boolean starred;
 

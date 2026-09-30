@@ -44,4 +44,18 @@ public class TokenUsageLogService {
         return total == null ? 0L : total;
     }
 
+    /** Admin raporu: kullanıcının verilen aralıkta toplam token kullanımı (userId ile). */
+    public int sumTokensByUserIdBetween(Long userId, LocalDateTime start, LocalDateTime end) {
+        User user = new User();
+        user.setId(userId);
+        return sumTokensByUserBetween(user, start, end);
+    }
+
+    /** Admin raporu: kullanıcının verilen aralıktaki üretim sayısı (userId ile). */
+    public long countByUserIdBetween(Long userId, LocalDateTime start, LocalDateTime end) {
+        User user = new User();
+        user.setId(userId);
+        return countByUserBetween(user, start, end);
+    }
+
 }

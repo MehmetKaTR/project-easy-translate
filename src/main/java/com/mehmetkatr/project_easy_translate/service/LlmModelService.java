@@ -26,4 +26,24 @@ public class LlmModelService {
     public void save(LlmModel llmModel) {
         llmModelRepository.save(llmModel);
     }
+
+    public List<LlmModel> findAll() {
+        return llmModelRepository.findAll();
+    }
+
+    public LlmModel create(String name, String description, LlmModel.Status status) {
+        LlmModel model = LlmModel.builder()
+                .name(name)
+                .description(description)
+                .status(status)
+                .build();
+        return llmModelRepository.save(model);
+    }
+
+    public LlmModel updateStatus(Long id, LlmModel.Status status) {
+        LlmModel model = llmModelRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("LLM modeli bulunamadı: " + id));
+        model.setStatus(status);
+        return llmModelRepository.save(model);
+    }
 }
