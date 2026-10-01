@@ -47,7 +47,6 @@ public class WordListController {
         newList.setUser(user);
         newList.setName(dto.getName());
         newList.setHexColorCode(dto.getColor());
-        newList.setWords(new LinkedHashSet<>());
 
         WordList saved = wordListService.createWordList(newList);
 

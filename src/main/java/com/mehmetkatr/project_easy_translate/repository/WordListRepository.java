@@ -25,16 +25,16 @@ public interface WordListRepository extends JpaRepository<WordList, Long> {
 
     List<WordList> findByUserAndNameContainingIgnoreCase(User user, String name);
 
-    @Query("SELECT wl FROM WordList wl LEFT JOIN FETCH wl.words WHERE wl.user.id = :userId")
+    @Query("SELECT wl FROM WordList wl LEFT JOIN FETCH wl.userWords WHERE wl.user.id = :userId")
     List<WordList> findAllByUserIdWithWords(@Param("userId") Long userId);
 
     @Modifying
     @Query(value = """
-            DELETE ww
-            FROM wordlist_words ww
-            INNER JOIN wordlists wl ON wl.id = ww.wordlist_id
-            WHERE wl.user_id = :userId
-            """, nativeQuery = true)
+        DELETE uww
+        FROM user_word_wordlist uww
+        INNER JOIN wordlists wl ON wl.id = uww.word_list_id
+        WHERE wl.user_id = :userId
+        """, nativeQuery = true)
     int deleteWordlistLinksByUserId(@Param("userId") Long userId);
 
     @Modifying
@@ -42,12 +42,12 @@ public interface WordListRepository extends JpaRepository<WordList, Long> {
     int deleteByUserIdNative(@Param("userId") Long userId);
 
     @Query(value = """
-        SELECT new com.mehmetkatr.project_easy_translate.dto.response.WordListSummaryResponse(
-            wl.id, wl.name, wl.hexColorCode, COUNT(w))
-        FROM WordList wl LEFT JOIN wl.words w
-        WHERE wl.user.id = :userId
-        GROUP BY wl.id, wl.name, wl.hexColorCode
-        """,
+    SELECT new com.mehmetkatr.project_easy_translate.dto.response.WordListSummaryResponse(
+        wl.id, wl.name, wl.hexColorCode, COUNT(uw))
+    FROM WordList wl LEFT JOIN wl.userWords uw
+    WHERE wl.user.id = :userId
+    GROUP BY wl.id, wl.name, wl.hexColorCode
+    """,
             countQuery = "SELECT COUNT(wl) FROM WordList wl WHERE wl.user.id = :userId")
     Page<WordListSummaryResponse> findSummariesByUserId(@Param("userId") Long userId, Pageable pageable);
 }

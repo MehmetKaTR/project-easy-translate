@@ -1,16 +1,19 @@
 package com.mehmetkatr.project_easy_translate.service;
 
+import com.mehmetkatr.project_easy_translate.entity.UserWord;
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
+import com.mehmetkatr.project_easy_translate.repository.UserRepository;
+import com.mehmetkatr.project_easy_translate.repository.UserWordRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordRepository;
-import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.Collection;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -18,63 +21,72 @@ import java.util.List;
 public class WordService {
 
     private final WordRepository wordRepository;
+    private final UserWordRepository userWordRepository;
+    private final UserRepository userRepository;
 
-    public List<Word> getWordsByWordList(WordList wordList) {
-        return wordRepository.findByWordList(wordList);
+    public Word findOrCreateWord(String text, String languageCode) {
+        String normalizedText = text.trim();
+        return wordRepository.findByTextIgnoreCaseAndLanguageCodeIgnoreCase(normalizedText, languageCode)
+                .orElseGet(() -> wordRepository.save(
+                        Word.builder()
+                                .text(normalizedText)
+                                .languageCode(languageCode)
+                                .build()));
     }
 
-    public Page<Word> getAllWordsByUser(Long userId, Pageable pageable) {
-        return wordRepository.findAllByUserId(userId, pageable);
+    public UserWord addUserWord(Long userId, String text, String translated, String languageCode,
+                                boolean starred, Collection<WordList> lists) {
+        Word word = findOrCreateWord(text, languageCode);
+
+        UserWord userWord = userWordRepository.findByUserIdAndWordId(userId, word.getId())
+                .orElseGet(() -> UserWord.builder()
+                        .user(userRepository.getReferenceById(userId))
+                        .word(word)
+                        .build());
+
+        if (translated != null && !translated.isBlank()) {
+            userWord.setTranslated(translated);
+        }
+        userWord.setStarred(starred);
+        if (lists != null && !lists.isEmpty()) {
+            userWord.getWordLists().addAll(lists);
+        }
+        return userWordRepository.save(userWord);
     }
 
-    public List<Word> getAllWordsByUser(Long userId) {
-        return wordRepository.findAllByUserId(userId);
+    public Page<UserWord> getUserWords(Long userId, Pageable pageable) {
+        return userWordRepository.findByUserId(userId, pageable);
     }
 
-    public Page<Word> getStarredWordsByUser(Long userId, Pageable pageable) {
-        return wordRepository.findStarredByUserId(userId, pageable);
+    public Page<UserWord> getStarredUserWords(Long userId, Pageable pageable) {
+        return userWordRepository.findByUserIdAndStarred(userId, true, pageable);
     }
 
-    public List<Word> getWordsByLanguageCode(String languageCode) {
-        return wordRepository.findByLanguageCode(languageCode);
+    public Page<UserWord> getUserWordsByWordList(Long wordListId, Long userId, Pageable pageable) {
+        return userWordRepository.findByWordListId(wordListId, userId, pageable);
     }
 
-    public List<Word> getByWordListAndLanguageCode(WordList wordList, String languageCode) {
-        return wordRepository.findByWordListAndLanguageCode(wordList, languageCode);
+    public Optional<UserWord> findUserWord(Long userId, Long userWordId) {
+        return userWordRepository.findByIdAndUserId(userWordId, userId);
     }
 
-    public List<Word> getByTranslation(String translated) {
-        return wordRepository.findByTranslated(translated);
+    public UserWord updateStarred(Long userId, Long userWordId, boolean starred) {
+        UserWord userWord = userWordRepository.findByIdAndUserId(userWordId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("UserWord not found: " + userWordId));
+        userWord.setStarred(starred);
+        return userWordRepository.save(userWord);
     }
 
-    public List<Word> getByWordListAndTranslated(WordList wordList, String translated) {
-        return wordRepository.findByWordListAndTranslated(wordList, translated);
+    public boolean deleteUserWord(Long userId, Long userWordId) {
+        return userWordRepository.findByIdAndUserId(userWordId, userId)
+                .map(userWord -> {
+                    userWordRepository.delete(userWord);
+                    return true;
+                })
+                .orElse(false);
     }
 
-    public Page<Word> getWordsByWordListId(Long wordListId, Pageable pageable) {
-        return wordRepository.findByWordListId(wordListId, pageable);
-    }
-
-    public List<Word> getByWordListAndStarred(WordList wordList, boolean starred) {
-        return wordRepository.findByWordListAndStarred(wordList, starred);
-    }
-
-    public Word addWord(Word word) {
-        return wordRepository.save(word);
-    }
-
-    public Word updateStarred(Long wordId, boolean starred) {
-        Word word = wordRepository.findById(wordId)
-                .orElseThrow(() -> new EntityNotFoundException("Word not found: " + wordId));
-        word.setStarred(starred);
-        return wordRepository.save(word);
-    }
-
-    public void deleteWord(Word word) {
-        wordRepository.delete(word);
-    }
-
-    public void deleteWordById(Long wordId) {
-        wordRepository.deleteById(wordId);
+    public UserWord save(UserWord userWord) {
+        return userWordRepository.save(userWord);
     }
 }

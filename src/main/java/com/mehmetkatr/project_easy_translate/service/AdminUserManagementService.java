@@ -10,8 +10,8 @@ import com.mehmetkatr.project_easy_translate.repository.RefreshTokenRepository;
 import com.mehmetkatr.project_easy_translate.repository.StoryRepository;
 import com.mehmetkatr.project_easy_translate.repository.TokenUsageLogRepository;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
+import com.mehmetkatr.project_easy_translate.repository.UserWordRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordListRepository;
-import com.mehmetkatr.project_easy_translate.repository.WordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +36,7 @@ public class AdminUserManagementService {
     private final AdminActionLogService adminActionLogService;
     private final PasswordEncoder passwordEncoder;
     private final WordListRepository wordListRepository;
-    private final WordRepository wordRepository;
+    private final UserWordRepository userWordRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final TokenUsageLogRepository tokenUsageLogRepository;
     private final AdminActionLogRepository adminActionLogRepository;
@@ -159,10 +159,9 @@ public class AdminUserManagementService {
         tokenUsageLogRepository.deleteByUserIdNative(userId);
         adminActionLogRepository.deleteByTargetUserIdNative(userId);
 
-        wordListRepository.deleteWordlistLinksByUserId(userId);
-        wordRepository.deleteWordlistLinksByWordOwnerId(userId);
-        wordListRepository.deleteByUserIdNative(userId);
-        wordRepository.deleteByUserIdNative(userId);
+        wordListRepository.deleteWordlistLinksByUserId(userId);   // user_word_wordlist baglarini kaldir
+        userWordRepository.deleteByUserId(userId);                // kullanicinin UserWord'leri (global Word'lere DOKUNMA)
+        wordListRepository.deleteByUserIdNative(userId);          // kullanicinin listeleri
 
         // Mongo stories are not constrained by SQL FKs but should be deleted with user.
         storyRepository.deleteByUserId(userId);

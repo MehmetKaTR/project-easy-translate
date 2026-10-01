@@ -42,6 +42,6 @@ public class WordList extends BaseEntity {
 
     @Builder.Default
     @ManyToMany(mappedBy = "wordLists")
-    private Set<Word> words = new LinkedHashSet<>();
+    private Set<UserWord> userWords = new LinkedHashSet<>();
 
 }
