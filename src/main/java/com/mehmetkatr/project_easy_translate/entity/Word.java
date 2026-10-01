@@ -1,14 +1,10 @@
 package com.mehmetkatr.project_easy_translate.entity;
 import com.mehmetkatr.project_easy_translate.entity.base.BaseEntity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
-
-import java.util.LinkedHashSet;
-import java.util.Set;
 
 @Getter
 @Setter
@@ -19,9 +15,9 @@ import java.util.Set;
 @Table(
         name = "words",
         indexes = {
-                @Index(name = "idx_words_user_id", columnList = "user_id"),
-                @Index(name = "idx_words_starred", columnList = "starred")
-        }
+                @Index(name="idx_words_text", columnList="text")
+        },
+        uniqueConstraints = @UniqueConstraint(name="uq_words_text_lang", columnNames={"text","language_code"})
 )
 public class Word extends BaseEntity {
 
@@ -30,33 +26,10 @@ public class Word extends BaseEntity {
     private Long id;
 
     @NotNull
-    @Size(min = 1, max = 50)
-    private String word;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnore
-    private User user;
+    @Size(min = 1, max = 100)
+    private String text;
 
     @NotNull
     private String languageCode;
 
-    @NotNull
-    @Size(min = 1, max = 50)
-    private String translated;
-
-    @Builder.Default
-    @Column(nullable = false)
-    private boolean starred = false;
-
-    @Builder.Default
-    @ManyToMany
-    @JoinTable(
-            name = "wordlist_words",
-            joinColumns = @JoinColumn(name = "word_id"),
-            inverseJoinColumns = @JoinColumn(name = "wordlist_id"),
-            uniqueConstraints = @UniqueConstraint(name = "uk_wordlist_words", columnNames = {"word_id", "wordlist_id"})
-    )
-    @JsonIgnore
-    private Set<WordList> wordLists = new LinkedHashSet<>();
 }

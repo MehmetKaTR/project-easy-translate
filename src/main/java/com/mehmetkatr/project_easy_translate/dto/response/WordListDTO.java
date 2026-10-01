@@ -28,6 +28,6 @@ public class WordListDTO {
         this.id = wordList.getId();
         this.name = wordList.getName();
         this.color = wordList.getHexColorCode();
-        this.words = new ArrayList<>(wordList.getWords());
+        // words alani sadece istek (request) icin tasiyici; yanitta doldurmuyoruz (master-detail).
     }
 }
