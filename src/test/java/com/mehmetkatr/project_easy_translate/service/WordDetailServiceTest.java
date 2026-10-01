@@ -30,6 +30,9 @@ class WordDetailServiceTest {
     private FreeDictionaryClient freeDictionaryClient;
 
     @Mock
+    private SentenceExampleClient sentenceExampleClient;
+
+    @Mock
     private TranslationSuggestionService translationSuggestionService;
 
     @Mock
@@ -42,6 +45,7 @@ class WordDetailServiceTest {
         service = new WordDetailService(
                 wordDetailRepository,
                 freeDictionaryClient,
+                sentenceExampleClient,
                 translationSuggestionService,
                 geminiClient,
                 new ObjectMapper());
