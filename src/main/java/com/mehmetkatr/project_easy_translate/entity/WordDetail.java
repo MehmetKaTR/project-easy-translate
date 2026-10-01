@@ -43,5 +43,10 @@ public class WordDetail extends BaseEntity {
     @Column(columnDefinition="LONGTEXT")
     private String examples;
 
+    // Genel kaynak (geriye donuk uyumluluk) + bolum bazli kaynaklar.
     private String source;
+
+    private String definitionSource;   // FREE_DICTIONARY | GEMINI
+    private String examplesSource;     // FREE_DICTIONARY | TATOEBA | GEMINI
+    private String translationSource;  // GOOGLE_TRANSLATE | GEMINI
 }
