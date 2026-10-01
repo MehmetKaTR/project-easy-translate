@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
+
 @Service
 @RequiredArgsConstructor
 public class TranslationSuggestionService {
@@ -21,14 +23,19 @@ public class TranslationSuggestionService {
         String source = normalizeLang(sourceLang, "en");
         String target = normalizeLang(targetLang, "tr");
 
-        String uri = UriComponentsBuilder
+        // Encode EXACTLY once and hand RestClient a ready URI object; passing a
+        // String would let RestClient encode a second time (space -> %20 -> %2520),
+        // which Google then echoes back as literal "%20" inside the translation.
+        URI uri = UriComponentsBuilder
                 .fromUriString("https://translate.googleapis.com/translate_a/single")
                 .queryParam("client", "gtx")
                 .queryParam("sl", source)
                 .queryParam("tl", target)
                 .queryParam("dt", "t")
                 .queryParam("q", text.trim())
-                .toUriString();
+                .encode()
+                .build()
+                .toUri();
 
         String raw = RestClient.create()
                 .get()

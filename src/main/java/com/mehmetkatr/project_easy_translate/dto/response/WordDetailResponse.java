@@ -8,6 +8,7 @@ public record WordDetailResponse(
         String targetLanguage,
         String partOfSpeech,
         String definition,
+        String definitionTranslation,
         List<String> synonyms,
         List<Example> examples,
         String source

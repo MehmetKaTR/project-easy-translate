@@ -95,7 +95,7 @@ public class WordController {
         if (allList.isEmpty()) return ResponseEntity.badRequest().build();
 
         UserWord saved = wordService.addUserWord(
-                uid, dto.getWord(), dto.getTranslated(), dto.getLanguageCode(),
+                uid, dto.getWord(), dto.getTranslated(), dto.getLanguageCode(), dto.getTargetLanguageCode(),
                 Boolean.TRUE.equals(dto.getStarred()), List.of(allList.get()));
         return ResponseEntity.ok(new WordDTO(saved));
     }
@@ -112,7 +112,7 @@ public class WordController {
         if (allList.isEmpty()) return ResponseEntity.badRequest().build();
 
         UserWord saved = wordService.addUserWord(
-                uid, dto.getWord(), dto.getTranslated(), dto.getLanguageCode(),
+                uid, dto.getWord(), dto.getTranslated(), dto.getLanguageCode(), dto.getTargetLanguageCode(),
                 Boolean.TRUE.equals(dto.getStarred()), List.of(allList.get(), targetList.get()));
         return ResponseEntity.ok(new WordDTO(saved));
     }

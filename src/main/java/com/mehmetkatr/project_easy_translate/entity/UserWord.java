@@ -38,6 +38,10 @@ public class UserWord  extends BaseEntity {
 
     private String translated;
 
+    // Language the user translated INTO (target). Drives word-detail example/definition translations.
+    @Column(length = 10)
+    private String targetLanguageCode;
+
     private boolean starred;
 
     @ManyToMany
