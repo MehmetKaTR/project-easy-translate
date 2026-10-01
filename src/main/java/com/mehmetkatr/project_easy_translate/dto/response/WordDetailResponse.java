@@ -11,7 +11,10 @@ public record WordDetailResponse(
         String definitionTranslation,
         List<String> synonyms,
         List<Example> examples,
-        String source
+        String source,
+        String definitionSource,
+        String examplesSource,
+        String translationSource
 ) {
     public record Example(String sentence, String translation) {
     }

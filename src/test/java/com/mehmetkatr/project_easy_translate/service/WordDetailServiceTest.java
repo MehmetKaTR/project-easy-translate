@@ -89,7 +89,7 @@ class WordDetailServiceTest {
 
         WordDetailResponse res = service.getOrCreate(word, "tr");
 
-        assertThat(res.source()).isEqualTo("DICTIONARY");
+        assertThat(res.source()).isEqualTo("FREE_DICTIONARY");
         assertThat(res.definition()).isEqualTo("def");
         assertThat(res.examples().get(0).translation()).isEqualTo("ceviri");
         verify(geminiClient, never()).generate(any());

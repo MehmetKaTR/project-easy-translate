@@ -3,6 +3,7 @@ package com.mehmetkatr.project_easy_translate.dto.response;
 import com.mehmetkatr.project_easy_translate.entity.UserWord;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -15,7 +16,10 @@ public class WordDTO {
     private Long id;
 
     @NotBlank
-    @Size(max = 255)
+    @Size(max = 100)
+    @Pattern(
+            regexp = "^\\p{L}[\\p{L} '’\\-]*$",
+            message = "Word must be a real word or phrase (letters, spaces, hyphen or apostrophe only)")
     private String word;
 
     @Size(max = 255)
