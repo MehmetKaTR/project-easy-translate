@@ -35,7 +35,7 @@ public class WordService {
     }
 
     public UserWord addUserWord(Long userId, String text, String translated, String languageCode,
-                                boolean starred, Collection<WordList> lists) {
+                                String targetLanguageCode, boolean starred, Collection<WordList> lists) {
         Word word = findOrCreateWord(text, languageCode);
 
         UserWord userWord = userWordRepository.findByUserIdAndWordId(userId, word.getId())
@@ -46,6 +46,9 @@ public class WordService {
 
         if (translated != null && !translated.isBlank()) {
             userWord.setTranslated(translated);
+        }
+        if (targetLanguageCode != null && !targetLanguageCode.isBlank()) {
+            userWord.setTargetLanguageCode(targetLanguageCode.trim().toLowerCase());
         }
         userWord.setStarred(starred);
         if (lists != null && !lists.isEmpty()) {

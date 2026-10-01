@@ -57,6 +57,7 @@ public class WordDetailService {
                 .targetLanguage(targetLanguage)
                 .partOfSpeech(result.partOfSpeech())
                 .definition(result.definition())
+                .definitionTranslation(safeTranslate(result.definition(), word.getLanguageCode(), targetLanguage))
                 .synonyms(writeJson(result.synonyms()))
                 .examples(writeJson(examples))
                 .source("DICTIONARY")
@@ -98,6 +99,7 @@ public class WordDetailService {
                 .targetLanguage(targetLanguage)
                 .partOfSpeech(partOfSpeech)
                 .definition(definition)
+                .definitionTranslation(safeTranslate(definition, word.getLanguageCode(), targetLanguage))
                 .synonyms(writeJson(synonyms))
                 .examples(writeJson(examples))
                 .source("GEMINI")
@@ -141,6 +143,7 @@ public class WordDetailService {
                 detail.getTargetLanguage(),
                 detail.getPartOfSpeech(),
                 detail.getDefinition(),
+                detail.getDefinitionTranslation(),
                 parseSynonyms(detail.getSynonyms()),
                 parseExamples(detail.getExamples()),
                 detail.getSource()

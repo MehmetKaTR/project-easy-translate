@@ -33,6 +33,10 @@ public class WordDetail extends BaseEntity {
     @Column(columnDefinition="TEXT")
     private String definition;
 
+    // Definition translated into the target language (shown under the original).
+    @Column(columnDefinition="TEXT")
+    private String definitionTranslation;
+
     @Column(columnDefinition="LONGTEXT")
     private String synonyms;
 

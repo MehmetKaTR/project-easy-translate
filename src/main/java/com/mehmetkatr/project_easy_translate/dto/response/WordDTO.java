@@ -24,6 +24,10 @@ public class WordDTO {
     @Size(max = 10)
     private String languageCode;
 
+    // Target language the user translated into (drives word-detail translations).
+    @Size(max = 10)
+    private String targetLanguageCode;
+
     private Long wordListId;
     private Boolean starred;
 
@@ -33,6 +37,7 @@ public class WordDTO {
         this.word = userWord.getWord().getText();
         this.translated = userWord.getTranslated();
         this.languageCode = userWord.getWord().getLanguageCode();
+        this.targetLanguageCode = userWord.getTargetLanguageCode();
         this.wordListId = userWord.getWordLists().stream().map(WordList::getId).findFirst().orElse(null);
         this.starred = userWord.isStarred();
     }
