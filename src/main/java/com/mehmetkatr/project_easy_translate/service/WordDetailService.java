@@ -25,6 +25,7 @@ public class WordDetailService {
 
     private final WordDetailRepository wordDetailRepository;
     private final FreeDictionaryClient freeDictionaryClient;
+    private final SentenceExampleClient sentenceExampleClient;
     private final TranslationSuggestionService translationSuggestionService;
     private final GeminiClient geminiClient;
     private final ObjectMapper objectMapper;
@@ -46,7 +47,13 @@ public class WordDetailService {
     }
 
     private WordDetail buildFromDictionary(Word word, String targetLanguage, FreeDictionaryClient.Result result) {
-        List<WordDetailResponse.Example> examples = result.examples().stream()
+        List<String> sentences = result.examples();
+        // Sozluk tanim verip ornek cumle vermediyse (or. "give rise to") Tatoeba'dan cek.
+        if (sentences == null || sentences.isEmpty()) {
+            sentences = sentenceExampleClient.lookup(word.getText(), word.getLanguageCode(), 2);
+        }
+
+        List<WordDetailResponse.Example> examples = sentences.stream()
                 .map(sentence -> new WordDetailResponse.Example(
                         sentence,
                         safeTranslate(sentence, word.getLanguageCode(), targetLanguage)))

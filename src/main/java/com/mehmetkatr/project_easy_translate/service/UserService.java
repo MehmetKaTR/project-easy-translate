@@ -10,6 +10,7 @@ import com.mehmetkatr.project_easy_translate.exception.AccountPendingDeletionExc
 import com.mehmetkatr.project_easy_translate.exception.AuthenticationFailedException;
 import com.mehmetkatr.project_easy_translate.exception.EmailNotVerifiedException;
 import com.mehmetkatr.project_easy_translate.exception.InvalidCodeException;
+import com.mehmetkatr.project_easy_translate.exception.InvalidRefreshTokenException;
 import com.mehmetkatr.project_easy_translate.exception.RateLimitExceededException;
 import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
@@ -214,11 +215,20 @@ public class UserService {
 
     @Transactional
     public AuthResponse refreshSession(String rawRefreshToken, String clientIp, String userAgent) {
-        RefreshTokenService.RotationResult rotated = refreshTokenService.rotateRefreshToken(rawRefreshToken, clientIp, userAgent);
-        User user = rotated.user();
-        assertAccountNotPendingDeletion(user);
-        String token = tokenService.generateToken(user.getUsername(), "ROLE_USER");
-        return buildAuthResponse(user, token, rotated.newRefreshToken());
+        try {
+            RefreshTokenService.RotationResult rotated = refreshTokenService.rotateRefreshToken(rawRefreshToken, clientIp, userAgent);
+            User user = rotated.user();
+            assertAccountNotPendingDeletion(user);
+            String token = tokenService.generateToken(user.getUsername(), "ROLE_USER");
+            return buildAuthResponse(user, token, rotated.newRefreshToken());
+        } catch (InvalidRefreshTokenException | AccountPendingDeletionException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            // Beklenmeyen bir hata (or. es zamanli rotasyon cakismasi) 500 olarak donup kullaniciyi
+            // aniden logout etmesin; 401 olarak isaretle, istemci temiz sekilde yeniden deneyebilsin.
+            log.warn("Refresh sirasinda beklenmeyen hata: {}", e.getMessage());
+            throw new InvalidRefreshTokenException("Refresh could not be completed");
+        }
     }
 
     @Transactional

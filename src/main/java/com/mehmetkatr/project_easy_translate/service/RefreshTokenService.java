@@ -98,6 +98,12 @@ public class RefreshTokenService {
         refreshTokenRepository.saveAll(activeTokens);
     }
 
+    // Birden fazla sekme / aninda tekrar denenen istek, ayni refresh token'i neredeyse es
+    // zamanli kullanabilir. Ilk istek token'i rotate edip iptal eder; ikincisi artik-iptal
+    // token'la gelince kullanici bosuna logout olmasin diye, kisa bir sure icinde "yeni surumu"
+    // (replacedByTokenHash) hala aktifse onun uzerinden rotasyona devam ederiz.
+    private static final long ROTATION_GRACE_SECONDS = 60;
+
     private RefreshToken findActiveToken(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
             throw new InvalidRefreshTokenException("Refresh token is missing");
@@ -105,13 +111,29 @@ public class RefreshTokenService {
         String tokenHash = hash(rawToken.trim());
         RefreshToken token = refreshTokenRepository.findFirstByTokenHash(tokenHash)
                 .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token is invalid"));
+
+        LocalDateTime now = LocalDateTime.now();
         if (token.getRevokedAt() != null) {
+            RefreshToken graced = resolveWithinGrace(token, now);
+            if (graced != null) return graced;
             throw new InvalidRefreshTokenException("Refresh token has been revoked");
         }
-        if (token.getExpiresAt() == null || token.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (token.getExpiresAt() == null || token.getExpiresAt().isBefore(now)) {
             throw new InvalidRefreshTokenException("Refresh token has expired");
         }
         return token;
+    }
+
+    /** Yakin zamanda rotate edilmis bir token icin hala aktif olan yerine gecen token'i dondur. */
+    private RefreshToken resolveWithinGrace(RefreshToken revoked, LocalDateTime now) {
+        if (revoked.getReplacedByTokenHash() == null) return null;
+        if (revoked.getRevokedAt() == null || revoked.getRevokedAt().isBefore(now.minusSeconds(ROTATION_GRACE_SECONDS))) {
+            return null;
+        }
+        RefreshToken replacement = refreshTokenRepository.findFirstByTokenHash(revoked.getReplacedByTokenHash()).orElse(null);
+        if (replacement == null || replacement.getRevokedAt() != null) return null;
+        if (replacement.getExpiresAt() == null || replacement.getExpiresAt().isBefore(now)) return null;
+        return replacement;
     }
 
     private String generateToken() {
