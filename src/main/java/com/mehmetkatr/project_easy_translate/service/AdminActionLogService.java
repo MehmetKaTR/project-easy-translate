@@ -6,7 +6,7 @@ import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.repository.AdminActionLogRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -49,10 +49,6 @@ public class AdminActionLogService {
 
     public List<AdminActionLog> findRecent(int limit) {
         int safeLimit = Math.max(1, Math.min(limit, 200));
-        List<AdminActionLog> all = adminActionLogRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
-        if (all.size() <= safeLimit) {
-            return all;
-        }
-        return all.subList(0, safeLimit);
+        return adminActionLogRepository.findRecentWithRefs(PageRequest.of(0, safeLimit));
     }
 }
