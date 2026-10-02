@@ -1,7 +1,7 @@
 package com.mehmetkatr.project_easy_translate.controller;
 import jakarta.validation.Valid;
 
-import com.mehmetkatr.project_easy_translate.service.TranslationSuggestionService;
+import com.mehmetkatr.project_easy_translate.service.SmartSuggestionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +19,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PublicController {
 
-    private final TranslationSuggestionService translationSuggestionService;
+    private final SmartSuggestionService smartSuggestionService;
 
     public static final class TranslateSuggestRequest {
         public String text;
@@ -42,7 +42,7 @@ public class PublicController {
             @RequestParam(defaultValue = "en") String source,
             @RequestParam(defaultValue = "tr") String target
     ) {
-        String suggested = translationSuggestionService.suggest(text, source, target);
+        String suggested = smartSuggestionService.suggest(text, source, target);
         return ResponseEntity.ok(Map.of(
                 "text", text,
                 "source", source,
@@ -59,7 +59,7 @@ public class PublicController {
         String source = request == null ? "en" : String.valueOf(request.source == null ? "en" : request.source);
         String target = request == null ? "tr" : String.valueOf(request.target == null ? "tr" : request.target);
 
-        String suggested = translationSuggestionService.suggest(text, source, target);
+        String suggested = smartSuggestionService.suggest(text, source, target);
         return ResponseEntity.ok(Map.of(
                 "text", text,
                 "source", source,
