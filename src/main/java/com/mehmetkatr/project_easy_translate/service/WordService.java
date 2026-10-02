@@ -1,12 +1,14 @@
 package com.mehmetkatr.project_easy_translate.service;
 
 import com.mehmetkatr.project_easy_translate.dto.response.AdminWordSummaryResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.AdminWordUserResponse;
 import com.mehmetkatr.project_easy_translate.entity.UserWord;
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import com.mehmetkatr.project_easy_translate.repository.UserWordRepository;
+import com.mehmetkatr.project_easy_translate.repository.WordDetailRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,6 +28,7 @@ public class WordService {
 
     private final WordRepository wordRepository;
     private final UserWordRepository userWordRepository;
+    private final WordDetailRepository wordDetailRepository;
     private final UserRepository userRepository;
 
     public Word findOrCreateWord(String text, String languageCode) {
@@ -57,6 +60,21 @@ public class WordService {
                 .orElseThrow(() -> new IllegalArgumentException("Word not found: " + wordId));
         word.setBlocked(blocked);
         wordRepository.save(word);
+    }
+
+    public List<AdminWordUserResponse> listWordUsers(Long wordId) {
+        return userWordRepository.findUsersForWord(wordId);
+    }
+
+    /**
+     * Global kelimeyi tamamen siler (blok DEGIL): tum kullanici kayitlari, liste baglari ve
+     * detay cache'i kaldirilir. Bloklu olmadigi icin bir kullanici tekrar eklerse yeniden olusur.
+     */
+    public void deleteGlobalWord(Long wordId) {
+        userWordRepository.deleteWordlistLinksByWordId(wordId);
+        userWordRepository.deleteByWordIdNative(wordId);
+        wordDetailRepository.deleteByWordIdNative(wordId);
+        wordRepository.deleteById(wordId);
     }
 
     public UserWord addUserWord(Long userId, String text, String translated, String languageCode,
