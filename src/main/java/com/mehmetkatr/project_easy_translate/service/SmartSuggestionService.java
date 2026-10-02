@@ -21,17 +21,23 @@ public class SmartSuggestionService {
 
     private static final Logger log = LoggerFactory.getLogger(SmartSuggestionService.class);
 
-    private static final String ENGINE_GOOGLE = "GOOGLE_TRANSLATE";
     private static final String ENGINE_GEMINI = "GEMINI";
 
     private final LanguageRuleset languageRuleset;
     private final TranslationCacheRepository translationCacheRepository;
-    private final TranslationSuggestionService translationSuggestionService; // Google (gtx)
     private final GeminiClient geminiClient;
 
-    /** Oneri sonucu: metin + hangi kaynaktan geldigi (GOOGLE_TRANSLATE | GEMINI | ""). */
+    /** Oneri sonucu: metin + hangi kaynaktan geldigi (GEMINI | ""). */
     public record Suggestion(String text, String engine) {}
 
+    /**
+     * Oneri pipeline'i (web + mobil ortak):
+     *  1) Ruleset — saçma girdiyi ele (hic dis cagri yok).
+     *  2) Cache — varsa aninda dondur (bedava).
+     *  3) Gemini — ceviriyi uret (idiom-farkinda), cache'e yaz.
+     * Not: ucretsiz Google (gtx) sunucu IP'sinden 429 (rate limit) verdigi icin
+     * oneride artik kullanilmiyor; Gemini key bazlidir, bu sorun yok.
+     */
     @Transactional
     public Suggestion suggest(String rawText, String rawSource, String rawTarget) {
         String text = rawText == null ? "" : rawText.trim();
@@ -40,7 +46,7 @@ public class SmartSuggestionService {
         if (text.isEmpty()) return new Suggestion("", "");
         if (source.equals(target)) return new Suggestion(text, "");
 
-        // Katman 1 — saçma girdiyi burada ele (hic dis cagri yok)
+        // Katman 1 — saçma girdiyi ele
         if (!languageRuleset.isMeaningful(text, source)) {
             return new Suggestion("", "");
         }
@@ -52,38 +58,13 @@ public class SmartSuggestionService {
             return new Suggestion(cached.get().getTranslation(), cached.get().getEngine());
         }
 
-        boolean multiWord = text.contains(" ");
-        String result;
-        String engine;
-
-        if (!multiWord) {
-            // Katman 3 — tek kelime: ucretsiz Google yeterli
-            result = safeGoogle(text, source, target);
-            engine = ENGINE_GOOGLE;
-        } else {
-            // Katman 4 — cok kelime: once Google (filtre)
-            String google = safeGoogle(text, source, target);
-            if (google.isBlank() || google.equalsIgnoreCase(text)) {
-                // Google ceviremedi -> muhtemelen anlamsiz -> Gemini'ye gitme
-                result = google;
-                engine = ENGINE_GOOGLE;
-            } else {
-                String gemini = safeGemini(text, source, target);
-                if (gemini.isBlank()) {
-                    result = google;
-                    engine = ENGINE_GOOGLE;
-                } else {
-                    result = gemini;
-                    engine = ENGINE_GEMINI;
-                }
-            }
-        }
-
+        // Katman 3 — Gemini
+        String result = safeGemini(text, source, target);
         if (result.isBlank()) {
             return new Suggestion("", "");
         }
-        saveToCache(cacheKey, source, target, result, engine);
-        return new Suggestion(result, engine);
+        saveToCache(cacheKey, source, target, result, ENGINE_GEMINI);
+        return new Suggestion(result, ENGINE_GEMINI);
     }
 
     private void saveToCache(String key, String source, String target, String translation, String engine) {
@@ -98,16 +79,6 @@ public class SmartSuggestionService {
         } catch (Exception e) {
             // Yaris durumunda unique cakismasi olabilir; onemli degil.
             log.debug("Ceviri cache yazilamadi: {}", e.getMessage());
-        }
-    }
-
-    private String safeGoogle(String text, String source, String target) {
-        try {
-            String v = translationSuggestionService.suggest(text, source, target);
-            return v == null ? "" : v.trim();
-        } catch (Exception e) {
-            log.info("Google oneri hatasi: {}", e.getMessage());
-            return "";
         }
     }
 
