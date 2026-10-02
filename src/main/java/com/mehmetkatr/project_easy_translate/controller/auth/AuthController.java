@@ -165,6 +165,11 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<UserProfileResponse> me(Authentication authentication) {
+        return ResponseEntity.ok(userService.currentUser(authentication.getName()));
+    }
+
     @PostMapping("/logout")
     public ResponseEntity<GenericMessageResponse> logout(
             @Valid @RequestBody(required = false) LogoutRequest request,

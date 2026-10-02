@@ -1,18 +1,22 @@
 package com.mehmetkatr.project_easy_translate.service;
 
+import com.mehmetkatr.project_easy_translate.dto.response.AdminWordSummaryResponse;
 import com.mehmetkatr.project_easy_translate.entity.UserWord;
 import com.mehmetkatr.project_easy_translate.entity.Word;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
+import com.mehmetkatr.project_easy_translate.exception.ResourceConflictException;
 import com.mehmetkatr.project_easy_translate.repository.UserRepository;
 import com.mehmetkatr.project_easy_translate.repository.UserWordRepository;
 import com.mehmetkatr.project_easy_translate.repository.WordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -26,12 +30,33 @@ public class WordService {
 
     public Word findOrCreateWord(String text, String languageCode) {
         String normalizedText = text.trim();
-        return wordRepository.findByTextIgnoreCaseAndLanguageCodeIgnoreCase(normalizedText, languageCode)
-                .orElseGet(() -> wordRepository.save(
-                        Word.builder()
-                                .text(normalizedText)
-                                .languageCode(languageCode)
-                                .build()));
+        Optional<Word> existing = wordRepository.findByTextIgnoreCaseAndLanguageCodeIgnoreCase(normalizedText, languageCode);
+        if (existing.isPresent()) {
+            if (existing.get().isBlocked()) {
+                throw new ResourceConflictException("WORD_BLOCKED", "This word is blocked by an administrator");
+            }
+            return existing.get();
+        }
+        return wordRepository.save(
+                Word.builder()
+                        .text(normalizedText)
+                        .languageCode(languageCode)
+                        .build());
+    }
+
+    // ---- Admin: global kelime yonetimi (blok = soft delete) ----
+
+    public List<AdminWordSummaryResponse> searchAdminWords(String query, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+        String q = (query == null || query.isBlank()) ? null : query.trim();
+        return wordRepository.searchAdminWords(q, PageRequest.of(0, safeLimit));
+    }
+
+    public void setWordBlocked(Long wordId, boolean blocked) {
+        Word word = wordRepository.findById(wordId)
+                .orElseThrow(() -> new IllegalArgumentException("Word not found: " + wordId));
+        word.setBlocked(blocked);
+        wordRepository.save(word);
     }
 
     public UserWord addUserWord(Long userId, String text, String translated, String languageCode,

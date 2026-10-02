@@ -2,11 +2,13 @@ package com.mehmetkatr.project_easy_translate.controller.admin;
 
 import com.mehmetkatr.project_easy_translate.dto.response.AdminActionLogResponse;
 import com.mehmetkatr.project_easy_translate.dto.response.AdminUserSummaryResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.AdminWordSummaryResponse;
 import com.mehmetkatr.project_easy_translate.dto.request.AdminUserUpdateRequest;
 import com.mehmetkatr.project_easy_translate.entity.AdminActionLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.service.AdminActionLogService;
 import com.mehmetkatr.project_easy_translate.service.AdminUserManagementService;
+import com.mehmetkatr.project_easy_translate.service.WordService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ public class AdminManagementController {
 
     private final AdminUserManagementService adminUserManagementService;
     private final AdminActionLogService adminActionLogService;
+    private final WordService wordService;
 
     @GetMapping("/users")
     public ResponseEntity<List<AdminUserSummaryResponse>> listUsers(
@@ -60,6 +63,28 @@ public class AdminManagementController {
                 .map(this::toLogResponse)
                 .toList();
         return ResponseEntity.ok(response);
+    }
+
+    // ---- Global word moderation (block = soft delete) ----
+
+    @GetMapping("/words")
+    public ResponseEntity<List<AdminWordSummaryResponse>> listWords(
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "100") int limit
+    ) {
+        return ResponseEntity.ok(wordService.searchAdminWords(query, limit));
+    }
+
+    @PostMapping("/words/{wordId}/block")
+    public ResponseEntity<Void> blockWord(@PathVariable Long wordId) {
+        wordService.setWordBlocked(wordId, true);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/words/{wordId}/unblock")
+    public ResponseEntity<Void> unblockWord(@PathVariable Long wordId) {
+        wordService.setWordBlocked(wordId, false);
+        return ResponseEntity.noContent().build();
     }
 
     private AdminUserSummaryResponse toUserSummary(User user) {

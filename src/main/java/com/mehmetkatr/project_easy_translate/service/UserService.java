@@ -4,6 +4,7 @@ import com.mehmetkatr.project_easy_translate.dto.response.AccountDeletionRespons
 import com.mehmetkatr.project_easy_translate.dto.response.AccountResponse;
 import com.mehmetkatr.project_easy_translate.dto.response.AuthResponse;
 import com.mehmetkatr.project_easy_translate.dto.response.UserPreferencesResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.UserProfileResponse;
 import com.mehmetkatr.project_easy_translate.entity.User;
 import com.mehmetkatr.project_easy_translate.entity.WordList;
 import com.mehmetkatr.project_easy_translate.exception.AccountPendingDeletionException;
@@ -211,6 +212,13 @@ public class UserService {
         }
 
         return socialLogin(googleUser.email(), requestedUsername, clientIp, userAgent);
+    }
+
+    @Transactional(readOnly = true)
+    public UserProfileResponse currentUser(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AuthenticationFailedException("User not found"));
+        return new UserProfileResponse(user.getId(), user.getUsername(), user.getSubscriptionLevel().name());
     }
 
     @Transactional
