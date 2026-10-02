@@ -42,12 +42,13 @@ public class PublicController {
             @RequestParam(defaultValue = "en") String source,
             @RequestParam(defaultValue = "tr") String target
     ) {
-        String suggested = smartSuggestionService.suggest(text, source, target);
+        SmartSuggestionService.Suggestion s = smartSuggestionService.suggest(text, source, target);
         return ResponseEntity.ok(Map.of(
                 "text", text,
                 "source", source,
                 "target", target,
-                "suggestion", suggested
+                "suggestion", s.text(),
+                "engine", s.engine()
         ));
     }
 
@@ -59,12 +60,13 @@ public class PublicController {
         String source = request == null ? "en" : String.valueOf(request.source == null ? "en" : request.source);
         String target = request == null ? "tr" : String.valueOf(request.target == null ? "tr" : request.target);
 
-        String suggested = smartSuggestionService.suggest(text, source, target);
+        SmartSuggestionService.Suggestion s = smartSuggestionService.suggest(text, source, target);
         return ResponseEntity.ok(Map.of(
                 "text", text,
                 "source", source,
                 "target", target,
-                "suggestion", suggested
+                "suggestion", s.text(),
+                "engine", s.engine()
         ));
     }
 }

@@ -29,24 +29,27 @@ public class SmartSuggestionService {
     private final TranslationSuggestionService translationSuggestionService; // Google (gtx)
     private final GeminiClient geminiClient;
 
+    /** Oneri sonucu: metin + hangi kaynaktan geldigi (GOOGLE_TRANSLATE | GEMINI | ""). */
+    public record Suggestion(String text, String engine) {}
+
     @Transactional
-    public String suggest(String rawText, String rawSource, String rawTarget) {
+    public Suggestion suggest(String rawText, String rawSource, String rawTarget) {
         String text = rawText == null ? "" : rawText.trim();
         String source = normalizeLang(rawSource, "en");
         String target = normalizeLang(rawTarget, "tr");
-        if (text.isEmpty()) return "";
-        if (source.equals(target)) return text;
+        if (text.isEmpty()) return new Suggestion("", "");
+        if (source.equals(target)) return new Suggestion(text, "");
 
         // Katman 1 — saçma girdiyi burada ele (hic dis cagri yok)
         if (!languageRuleset.isMeaningful(text, source)) {
-            return "";
+            return new Suggestion("", "");
         }
 
         // Katman 2 — cache
         String cacheKey = text.toLowerCase();
         var cached = translationCacheRepository.findBySourceTextAndSourceLangAndTargetLang(cacheKey, source, target);
         if (cached.isPresent()) {
-            return cached.get().getTranslation();
+            return new Suggestion(cached.get().getTranslation(), cached.get().getEngine());
         }
 
         boolean multiWord = text.contains(" ");
@@ -76,10 +79,11 @@ public class SmartSuggestionService {
             }
         }
 
-        if (!result.isBlank()) {
-            saveToCache(cacheKey, source, target, result, engine);
+        if (result.isBlank()) {
+            return new Suggestion("", "");
         }
-        return result;
+        saveToCache(cacheKey, source, target, result, engine);
+        return new Suggestion(result, engine);
     }
 
     private void saveToCache(String key, String source, String target, String translation, String engine) {

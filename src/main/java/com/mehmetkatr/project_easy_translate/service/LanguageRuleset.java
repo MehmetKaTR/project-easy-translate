@@ -42,13 +42,27 @@ public class LanguageRuleset {
         Rule rule = RULES.getOrDefault(
                 languageCode == null ? "en" : languageCode.trim().toLowerCase(), GENERIC);
 
-        String[] tokens = trimmed.toLowerCase().split("\\s+");
-        for (String rawToken : tokens) {
-            // Kelime kenarindaki tire/kesme vb. temizle (icerik kalsin)
+        String[] rawTokens = trimmed.toLowerCase().split("\\s+");
+        if (rawTokens.length > 12) return false; // asiri uzun saçma dizi
+
+        java.util.List<String> tokens = new java.util.ArrayList<>();
+        int contentWords = 0;
+        for (String rawToken : rawTokens) {
             String token = rawToken.replaceAll("^[-'’]+|[-'’]+$", "");
             if (token.isEmpty()) continue;
             if (!isValidToken(token, rule)) return false;
+            tokens.add(token);
+            if (token.replaceAll("[^\\p{L}]", "").length() >= 2) contentWords++;
         }
+        if (tokens.isEmpty()) return false;
+
+        // En az bir gercek "icerik" kelimesi (>=2 harf) olmali:
+        //  "a", "a a a a" -> icerik yok -> ele.  "a piece of cake" -> piece/cake var -> gecer.
+        if (contentWords == 0) return false;
+
+        // Tekrar spam'i: 3+ token ve hepsi ayni ("la la la", "cake cake cake") -> ele.
+        if (tokens.size() >= 3 && tokens.stream().distinct().count() == 1) return false;
+
         return true;
     }
 
