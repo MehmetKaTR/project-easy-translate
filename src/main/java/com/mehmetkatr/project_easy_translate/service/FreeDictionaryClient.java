@@ -47,6 +47,19 @@ public class FreeDictionaryClient {
         String term = word == null ? "" : word.trim();
         if (term.isEmpty()) return Optional.empty();
 
+        // Wiktionary buyuk/kucuk harfe duyarli ("Break the ice" 404, "break the ice" bulunur).
+        // Once yazildigi haliyle dene (ozel isimler icin), bulamazsa kucuk harfle tekrar dene.
+        Optional<Result> result = fetchAndParse(term, lang);
+        if (result.isEmpty()) {
+            String lower = term.toLowerCase();
+            if (!lower.equals(term)) {
+                result = fetchAndParse(lower, lang);
+            }
+        }
+        return result;
+    }
+
+    private Optional<Result> fetchAndParse(String term, String lang) {
         try {
             String body = restClient.get()
                     .uri("https://freedictionaryapi.com/api/v1/entries/{lang}/{word}", lang, term)
