@@ -47,16 +47,35 @@ public class FreeDictionaryClient {
         String term = word == null ? "" : word.trim();
         if (term.isEmpty()) return Optional.empty();
 
-        // Wiktionary buyuk/kucuk harfe duyarli ("Break the ice" 404, "break the ice" bulunur).
-        // Once yazildigi haliyle dene (ozel isimler icin), bulamazsa kucuk harfle tekrar dene.
-        Optional<Result> result = fetchAndParse(term, lang);
-        if (result.isEmpty()) {
-            String lower = term.toLowerCase();
-            if (!lower.equals(term)) {
-                result = fetchAndParse(lower, lang);
+        // Wiktionary buyuk/kucuk harfe duyarli ve idiomlari genelde bassiz saklar:
+        //  - "Break the ice" 404 -> "break the ice"
+        //  - "a piece of cake" 404 -> "piece of cake" (bastaki a/an/the atilir)
+        // Adaylari sirayla dene, ilk dolu sonucu dondur.
+        for (String candidate : candidateTerms(term)) {
+            Optional<Result> result = fetchAndParse(candidate, lang);
+            if (result.isPresent()) return result;
+        }
+        return Optional.empty();
+    }
+
+    /** Aranacak terim varyantlari: orijinal, kucuk harf, bastaki artikel atilmis hali. */
+    private List<String> candidateTerms(String term) {
+        List<String> out = new ArrayList<>();
+        out.add(term);
+        String lower = term.toLowerCase();
+        if (!out.contains(lower)) out.add(lower);
+        String stripped = stripLeadingArticle(lower);
+        if (!stripped.equals(lower) && !out.contains(stripped)) out.add(stripped);
+        return out;
+    }
+
+    private String stripLeadingArticle(String lower) {
+        for (String article : new String[]{"a ", "an ", "the "}) {
+            if (lower.startsWith(article) && lower.length() > article.length()) {
+                return lower.substring(article.length()).trim();
             }
         }
-        return result;
+        return lower;
     }
 
     private Optional<Result> fetchAndParse(String term, String lang) {
