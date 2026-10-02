@@ -3,6 +3,7 @@ package com.mehmetkatr.project_easy_translate.controller.admin;
 import com.mehmetkatr.project_easy_translate.dto.response.AdminActionLogResponse;
 import com.mehmetkatr.project_easy_translate.dto.response.AdminUserSummaryResponse;
 import com.mehmetkatr.project_easy_translate.dto.response.AdminWordSummaryResponse;
+import com.mehmetkatr.project_easy_translate.dto.response.AdminWordUserResponse;
 import com.mehmetkatr.project_easy_translate.dto.request.AdminUserUpdateRequest;
 import com.mehmetkatr.project_easy_translate.entity.AdminActionLog;
 import com.mehmetkatr.project_easy_translate.entity.User;
@@ -84,6 +85,18 @@ public class AdminManagementController {
     @PostMapping("/words/{wordId}/unblock")
     public ResponseEntity<Void> unblockWord(@PathVariable Long wordId) {
         wordService.setWordBlocked(wordId, false);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/words/{wordId}/users")
+    public ResponseEntity<List<AdminWordUserResponse>> wordUsers(@PathVariable Long wordId) {
+        return ResponseEntity.ok(wordService.listWordUsers(wordId));
+    }
+
+    // Soft delete: kelimeyi tamamen kaldirir (blok degil); kullanici sonra yeniden ekleyebilir.
+    @DeleteMapping("/words/{wordId}")
+    public ResponseEntity<Void> deleteWord(@PathVariable Long wordId) {
+        wordService.deleteGlobalWord(wordId);
         return ResponseEntity.noContent().build();
     }
 
