@@ -11,9 +11,12 @@ import java.util.Optional;
 
 public interface UserWordRepository extends JpaRepository<UserWord, Long> {
 
-    Page<UserWord> findByUserId(Long userId, Pageable pageable);
+    // Not: bloklanmis global kelimeler kullanici listelerinde gizlenir (uw.word.blocked = false).
+    @Query("SELECT uw FROM UserWord uw WHERE uw.user.id = :userId AND uw.word.blocked = false")
+    Page<UserWord> findByUserId(@Param("userId") Long userId, Pageable pageable);
 
-    Page<UserWord> findByUserIdAndStarred(Long userId, boolean starred, Pageable pageable);
+    @Query("SELECT uw FROM UserWord uw WHERE uw.user.id = :userId AND uw.starred = :starred AND uw.word.blocked = false")
+    Page<UserWord> findByUserIdAndStarred(@Param("userId") Long userId, @Param("starred") boolean starred, Pageable pageable);
 
     Optional<UserWord> findByIdAndUserId(Long id, Long userId);
 
@@ -21,7 +24,7 @@ public interface UserWordRepository extends JpaRepository<UserWord, Long> {
 
     long deleteByUserId(Long userId);
 
-    @Query("SELECT uw FROM UserWord uw JOIN uw.wordLists wl WHERE wl.id = :wordListId AND uw.user.id = :userId")
+    @Query("SELECT uw FROM UserWord uw JOIN uw.wordLists wl WHERE wl.id = :wordListId AND uw.user.id = :userId AND uw.word.blocked = false")
     Page<UserWord> findByWordListId(@Param("wordListId") Long wordListId, @Param("userId") Long userId, Pageable pageable);
 
 }

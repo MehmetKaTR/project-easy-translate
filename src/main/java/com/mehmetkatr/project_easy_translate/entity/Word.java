@@ -32,4 +32,9 @@ public class Word extends BaseEntity {
     @NotNull
     private String languageCode;
 
+    // Admin tarafindan bloklanmis (soft): tekrar eklenemez ve kullanici listelerinde gizlenir.
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean blocked = false;
+
 }
