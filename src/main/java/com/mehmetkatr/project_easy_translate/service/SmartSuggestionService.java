@@ -10,10 +10,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Katmanli ceviri onerisi (web + mobil ortak):
- *  Katman 1: dile ozel ruleset (saçma girdiyi ele).
- *  Katman 2: paylasimli cache (varsa dis cagri yok).
- *  Katman 3: tek kelime -> ucretsiz Google.
- *  Katman 4: cok kelime -> once Google (filtre); cevrilebiliyorsa Gemini ile idiomatik duzelt.
+ *  1) Ruleset — saçma girdiyi ele (hic dis cagri yok).
+ *  2) Cache — varsa aninda dondur (bedava).
+ *  3) Hibrit:
+ *     - Tek kelime  -> once Google (HIZLI); bos/429 ise Gemini'ye dus.
+ *     - Cok kelime  -> once Gemini (idiom-farkinda); bos ise Google'a dus.
+ *  4) Sonuc cache'lenir (hangi motordan geldiyse o kaydedilir).
  */
 @Service
 @RequiredArgsConstructor
@@ -21,23 +23,17 @@ public class SmartSuggestionService {
 
     private static final Logger log = LoggerFactory.getLogger(SmartSuggestionService.class);
 
+    private static final String ENGINE_GOOGLE = "GOOGLE_TRANSLATE";
     private static final String ENGINE_GEMINI = "GEMINI";
 
     private final LanguageRuleset languageRuleset;
     private final TranslationCacheRepository translationCacheRepository;
+    private final TranslationSuggestionService translationSuggestionService; // Google (gtx), hizli
     private final GeminiClient geminiClient;
 
-    /** Oneri sonucu: metin + hangi kaynaktan geldigi (GEMINI | ""). */
+    /** Oneri sonucu: metin + hangi kaynaktan geldigi (GOOGLE_TRANSLATE | GEMINI | ""). */
     public record Suggestion(String text, String engine) {}
 
-    /**
-     * Oneri pipeline'i (web + mobil ortak):
-     *  1) Ruleset — saçma girdiyi ele (hic dis cagri yok).
-     *  2) Cache — varsa aninda dondur (bedava).
-     *  3) Gemini — ceviriyi uret (idiom-farkinda), cache'e yaz.
-     * Not: ucretsiz Google (gtx) sunucu IP'sinden 429 (rate limit) verdigi icin
-     * oneride artik kullanilmiyor; Gemini key bazlidir, bu sorun yok.
-     */
     @Transactional
     public Suggestion suggest(String rawText, String rawSource, String rawTarget) {
         String text = rawText == null ? "" : rawText.trim();
@@ -58,13 +54,43 @@ public class SmartSuggestionService {
             return new Suggestion(cached.get().getTranslation(), cached.get().getEngine());
         }
 
-        // Katman 3 — Gemini
-        String result = safeGemini(text, source, target);
+        boolean multiWord = text.contains(" ");
+        String result;
+        String engine;
+
+        if (!multiWord) {
+            // Tek kelime: HIZLI Google; bos/429 ise Gemini fallback.
+            result = safeGoogle(text, source, target);
+            engine = ENGINE_GOOGLE;
+            if (result.isBlank()) {
+                result = safeGemini(text, source, target);
+                engine = ENGINE_GEMINI;
+            }
+        } else {
+            // Cok kelime (idiom): once Gemini (idiomatik); bos ise Google fallback.
+            result = safeGemini(text, source, target);
+            engine = ENGINE_GEMINI;
+            if (result.isBlank()) {
+                result = safeGoogle(text, source, target);
+                engine = ENGINE_GOOGLE;
+            }
+        }
+
         if (result.isBlank()) {
             return new Suggestion("", "");
         }
-        saveToCache(cacheKey, source, target, result, ENGINE_GEMINI);
-        return new Suggestion(result, ENGINE_GEMINI);
+        saveToCache(cacheKey, source, target, result, engine);
+        return new Suggestion(result, engine);
+    }
+
+    private String safeGoogle(String text, String source, String target) {
+        try {
+            String v = translationSuggestionService.suggest(text, source, target);
+            return v == null ? "" : v.trim();
+        } catch (Exception e) {
+            log.info("Google oneri hatasi: {}", e.getMessage());
+            return "";
+        }
     }
 
     private void saveToCache(String key, String source, String target, String translation, String engine) {

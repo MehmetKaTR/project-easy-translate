@@ -1,6 +1,8 @@
 package com.mehmetkatr.project_easy_translate.controller;
 import jakarta.validation.Valid;
 
+import com.mehmetkatr.project_easy_translate.dto.response.DictionaryCardResponse;
+import com.mehmetkatr.project_easy_translate.service.DictionaryService;
 import com.mehmetkatr.project_easy_translate.service.SmartSuggestionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,7 @@ import java.util.Map;
 public class PublicController {
 
     private final SmartSuggestionService smartSuggestionService;
+    private final DictionaryService dictionaryService;
 
     public static final class TranslateSuggestRequest {
         public String text;
@@ -34,6 +37,16 @@ public class PublicController {
                 "service", "project_easy_translate",
                 "timestamp", Instant.now().toString()
         ));
+    }
+
+    @GetMapping("/dictionary")
+    public ResponseEntity<DictionaryCardResponse> dictionaryCard(
+            @RequestParam String word,
+            @RequestParam(defaultValue = "tr") String target
+    ) {
+        return dictionaryService.getCard(word, target)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/translate/suggest")

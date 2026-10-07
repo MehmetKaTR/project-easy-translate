@@ -44,6 +44,25 @@ public class UserWord  extends BaseEntity {
 
     private boolean starred;
 
+    // --- TaleMind Sozlugu baglantisi (Faz 5'te kullanilacak; nullable, mevcut akisi bozmaz) ---
+    /** Eslesti ise dictionary_entry.id (zengin kart). */
+    @Column(name = "dictionary_entry_id")
+    private Long dictionaryEntryId;
+
+    /** Secili anlam dictionary_sense.id (homonymde hangi anlam). */
+    @Column(name = "sense_id")
+    private Long senseId;
+
+    /** Kullanicinin kendi yazdigi serbest kelime (sozlukte yok). */
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean custom = false;
+
+    /** Premium AI ile uretilmis kart. */
+    @Builder.Default
+    @Column(name = "ai_generated", nullable = false)
+    private boolean aiGenerated = false;
+
     @ManyToMany
     @JoinTable(name="user_word_wordlist",
             joinColumns=@JoinColumn(name="user_word_id"),
