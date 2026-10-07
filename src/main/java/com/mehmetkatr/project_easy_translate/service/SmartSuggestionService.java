@@ -8,14 +8,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
- * Katmanli ceviri onerisi (web + mobil ortak):
- *  1) Ruleset — saçma girdiyi ele (hic dis cagri yok).
+ * Ceviri onerisi (web + mobil ortak), tek NMT motoru:
+ *  1) Ruleset — anlamsiz girdiyi ele (hic dis cagri yok).
  *  2) Cache — varsa aninda dondur (bedava).
- *  3) Hibrit:
- *     - Tek kelime  -> once Google (HIZLI); bos/429 ise Gemini'ye dus.
- *     - Cok kelime  -> once Gemini (idiom-farkinda); bos ise Google'a dus.
- *  4) Sonuc cache'lenir (hangi motordan geldiyse o kaydedilir).
+ *  3) Microsoft Translator (key varsa) / yoksa MyMemory ile cevir (hizli, NMT).
+ *  4) Sonuc cache'lenir.
+ *
+ * Not: Cumle URETME (sozluk ornekleri) ayri is, Gemini ile DictionaryService enrich'te yapilir.
  */
 @Service
 @RequiredArgsConstructor
@@ -23,15 +25,12 @@ public class SmartSuggestionService {
 
     private static final Logger log = LoggerFactory.getLogger(SmartSuggestionService.class);
 
-    private static final String ENGINE_GOOGLE = "GOOGLE_TRANSLATE";
-    private static final String ENGINE_GEMINI = "GEMINI";
-
     private final LanguageRuleset languageRuleset;
     private final TranslationCacheRepository translationCacheRepository;
-    private final TranslationSuggestionService translationSuggestionService; // Google (gtx), hizli
-    private final GeminiClient geminiClient;
+    private final MicrosoftTranslatorClient microsoftTranslator;
+    private final MyMemoryTranslatorClient myMemoryTranslator;
 
-    /** Oneri sonucu: metin + hangi kaynaktan geldigi (GOOGLE_TRANSLATE | GEMINI | ""). */
+    /** Oneri sonucu: metin + hangi kaynaktan geldigi (MICROSOFT | MYMEMORY | ""). */
     public record Suggestion(String text, String engine) {}
 
     @Transactional
@@ -42,40 +41,22 @@ public class SmartSuggestionService {
         if (text.isEmpty()) return new Suggestion("", "");
         if (source.equals(target)) return new Suggestion(text, "");
 
-        // Katman 1 — saçma girdiyi ele
+        // Katman 1 — anlamsiz girdiyi ele
         if (!languageRuleset.isMeaningful(text, source)) {
             return new Suggestion("", "");
         }
 
         // Katman 2 — cache
         String cacheKey = text.toLowerCase();
-        var cached = translationCacheRepository.findBySourceTextAndSourceLangAndTargetLang(cacheKey, source, target);
+        var cached = translationCacheRepository
+                .findBySourceTextAndSourceLangAndTargetLang(cacheKey, source, target);
         if (cached.isPresent()) {
             return new Suggestion(cached.get().getTranslation(), cached.get().getEngine());
         }
 
-        boolean multiWord = text.contains(" ");
-        String result;
-        String engine;
-
-        if (!multiWord) {
-            // Tek kelime: HIZLI Google; bos/429 ise Gemini fallback.
-            result = safeGoogle(text, source, target);
-            engine = ENGINE_GOOGLE;
-            if (result.isBlank()) {
-                result = safeGemini(text, source, target);
-                engine = ENGINE_GEMINI;
-            }
-        } else {
-            // Cok kelime (idiom): once Gemini (idiomatik); bos ise Google fallback.
-            result = safeGemini(text, source, target);
-            engine = ENGINE_GEMINI;
-            if (result.isBlank()) {
-                result = safeGoogle(text, source, target);
-                engine = ENGINE_GOOGLE;
-            }
-        }
-
+        // Katman 3 — NMT (Microsoft / MyMemory)
+        String engine = microsoftTranslator.isConfigured() ? "MICROSOFT" : "MYMEMORY";
+        String result = translate(text, source, target);
         if (result.isBlank()) {
             return new Suggestion("", "");
         }
@@ -83,12 +64,16 @@ public class SmartSuggestionService {
         return new Suggestion(result, engine);
     }
 
-    private String safeGoogle(String text, String source, String target) {
+    private String translate(String text, String source, String target) {
         try {
-            String v = translationSuggestionService.suggest(text, source, target);
-            return v == null ? "" : v.trim();
+            if (microsoftTranslator.isConfigured()) {
+                List<String> r = microsoftTranslator.translate(List.of(text), source, target);
+                if (!r.isEmpty() && r.get(0) != null && !r.get(0).isBlank()) return r.get(0).trim();
+            }
+            String mm = myMemoryTranslator.translateOne(text, source, target);
+            return mm == null ? "" : mm.trim();
         } catch (Exception e) {
-            log.info("Google oneri hatasi: {}", e.getMessage());
+            log.info("oneri ceviri hatasi: {}", e.getMessage());
             return "";
         }
     }
@@ -103,39 +88,8 @@ public class SmartSuggestionService {
                     .engine(engine)
                     .build());
         } catch (Exception e) {
-            // Yaris durumunda unique cakismasi olabilir; onemli degil.
             log.debug("Ceviri cache yazilamadi: {}", e.getMessage());
         }
-    }
-
-    private String safeGemini(String text, String source, String target) {
-        try {
-            String prompt = """
-                    Translate the following %s word or phrase into %s.
-                    If it is an idiom or fixed expression, give the natural idiomatic equivalent,
-                    NOT a literal word-by-word translation.
-                    Return ONLY the translation text: no quotes, no notes, no alternatives.
-                    Text: %s
-                    """.formatted(source, target, text);
-            String raw = geminiClient.generate(prompt);
-            return cleanGemini(raw);
-        } catch (Exception e) {
-            log.info("Gemini oneri hatasi: {}", e.getMessage());
-            return "";
-        }
-    }
-
-    private String cleanGemini(String raw) {
-        if (raw == null) return "";
-        String out = raw.trim();
-        // ilk satiri al
-        int nl = out.indexOf('\n');
-        if (nl >= 0) out = out.substring(0, nl).trim();
-        // olasi "Translation:" onekini ve tirnaklari temizle
-        out = out.replaceAll("(?i)^translation\\s*:\\s*", "").trim();
-        out = out.replaceAll("^[\"'“”‘’]+|[\"'“”‘’]+$", "").trim();
-        if (out.length() > 160) out = out.substring(0, 160).trim();
-        return out;
     }
 
     private String normalizeLang(String input, String fallback) {
