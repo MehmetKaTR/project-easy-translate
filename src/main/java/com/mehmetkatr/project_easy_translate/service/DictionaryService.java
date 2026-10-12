@@ -51,8 +51,9 @@ public class DictionaryService {
     private final TranslationCacheRepository translationCacheRepository;
     private final MicrosoftTranslatorClient microsoftTranslator;  // key varsa birincil
     private final MyMemoryTranslatorClient myMemoryTranslator;     // anahtarsiz varsayilan
-    private final GeminiClient geminiClient;                       // sadece offline enrich
+    private final GeminiClient geminiClient;                       // sadece enrich
     private final ObjectMapper objectMapper;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     // ================================ RUNTIME (kart) ================================
 
@@ -72,15 +73,13 @@ public class DictionaryService {
         if (opt.isEmpty()) return Optional.empty();
         DictionaryEntry entry = opt.get();
 
-        // Lazy enrich: bu kelime daha once zenginlesmediyse, ILK acilista Gemini ile
-        // (en yaygin 3 anlam sirasi + eksik ornek) yap ve kaydet. Basarisizsa (kota/503)
-        // isaretlenmez, Wiktionary sirasiyla gosterilir; sonraki acilista tekrar denenir.
+        // Lazy enrich — ASENKRON: kelime zenginlesmediyse Gemini'yi ARKA PLANDA tetikle
+        // (kullanici beklemez). Bu acilista Wiktionary sirasi + Microsoft ceviri doner;
+        // enrich bitince SONRAKI acilis zenginlesmis (dogru sira + AI ornek) gelir.
+        boolean enriching = false;
         if (!entry.isAiEnriched()) {
-            try {
-                enrichPage(java.util.List.of(entry.getId()));
-            } catch (Exception e) {
-                log.debug("lazy enrich hatasi: {}", e.getMessage());
-            }
+            eventPublisher.publishEvent(new DictionaryEnrichListener.EnrichRequested(entry.getId()));
+            enriching = true;
         }
 
         List<DictionarySense> chosen = chosenSenses(entry);
@@ -107,7 +106,7 @@ public class DictionaryService {
         return Optional.of(new DictionaryCardResponse(
                 entry.getWord(), entry.getCefr(), entry.isIdiom(),
                 target, primary, SRC_DEFINITION, engineName(), exampleSource,
-                parseForms(entry.getFormsJson()), senses));
+                enriching, parseForms(entry.getFormsJson()), senses));
     }
 
     /** Kartta gosterilecek anlamlar: enrich varsa common_rank'e gore ilk 3, yoksa Wiktionary ilk 3. */

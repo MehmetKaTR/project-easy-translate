@@ -15,6 +15,7 @@ public record DictionaryCardResponse(
         String definitionSource,     // or. "Wiktionary (CC BY-SA)"
         String translationSource,    // or. "Microsoft Translator"
         String exampleSource,        // or. "Wiktionary" veya "AI (Gemini)"
+        boolean enriching,           // true: Gemini arka planda siralama+ornek hazirliyor (sonraki acilista zenginlesir)
         List<Form> forms,
         List<Sense> senses
 ) {
