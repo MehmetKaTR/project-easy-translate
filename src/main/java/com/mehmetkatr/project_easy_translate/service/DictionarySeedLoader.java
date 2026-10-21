@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mehmetkatr.project_easy_translate.entity.DictionaryEntry;
 import com.mehmetkatr.project_easy_translate.entity.DictionarySense;
+import com.mehmetkatr.project_easy_translate.entity.DictionarySenseTr;
 import com.mehmetkatr.project_easy_translate.repository.DictionaryEntryRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -102,7 +103,10 @@ public class DictionarySeedLoader implements CommandLineRunner {
                 .word(text(n, "word"))
                 .languageCode("en")
                 .cefr(text(n, "cefr"))
+                .topic(text(n, "topic"))
+                .source(n.path("source").asText("CEFR"))
                 .idiom(n.path("idiom").asBoolean(false))
+                .aiEnriched(true)                 // saf Gemini kart: hazir, runtime enrich gerekmez
                 .formsJson(jsonOrEmpty(n.get("forms")))
                 .build();
 
@@ -110,19 +114,67 @@ public class DictionarySeedLoader implements CommandLineRunner {
         JsonNode senses = n.get("senses");
         if (senses != null && senses.isArray()) {
             for (JsonNode sn : senses) {
+                // tanim: yeni format def_en, geri uyum icin definition
+                String defEn = text(sn, "def_en");
+                if (defEn == null) defEn = text(sn, "definition");
+
+                // ornekleri EN/TR'ye ayir ([{en,tr}] veya eski duz string)
+                List<String> exEn = new ArrayList<>();
+                List<String> exTr = new ArrayList<>();
+                JsonNode exs = sn.get("examples");
+                if (exs != null && exs.isArray()) {
+                    for (JsonNode ex : exs) {
+                        if (ex.isObject()) {
+                            String en = text(ex, "en");
+                            if (en != null && !en.isBlank()) {
+                                exEn.add(en);
+                                exTr.add(ex.path("tr").asText(""));
+                            }
+                        } else if (ex.isTextual() && !ex.asText().isBlank()) {
+                            exEn.add(ex.asText());
+                        }
+                    }
+                }
+
                 DictionarySense sense = DictionarySense.builder()
                         .entry(entry)
-                        .senseOrder(order++)
+                        .senseOrder(order)
+                        .commonRank(order)
+                        .exampleAi(true)
                         .pos(text(sn, "pos"))
                         .idiom(sn.path("_idiom").asBoolean(false))
-                        .definition(text(sn, "definition"))
-                        .examplesJson(jsonOrEmpty(sn.get("examples")))
+                        .definition(defEn)
+                        .examplesJson(toJsonArray(exEn))
                         .synonymsJson(jsonOrEmpty(sn.get("synonyms")))
                         .build();
+
+                // TR cevirisi (hazir) -> dictionary_sense_tr
+                String defTr = text(sn, "def_tr");
+                if ((defTr != null && !defTr.isBlank()) || !exTr.isEmpty()) {
+                    DictionarySenseTr tr = DictionarySenseTr.builder()
+                            .sense(sense)
+                            .targetLang("tr")
+                            .definitionTr(defTr)
+                            .examplesTrJson(toJsonArray(exTr))
+                            .engine("GEMINI")
+                            .displayRank(order)
+                            .build();
+                    sense.getTranslations().add(tr);
+                }
+
                 entry.getSenses().add(sense);
+                order++;
             }
         }
         return entry;
+    }
+
+    private String toJsonArray(List<String> list) {
+        try {
+            return objectMapper.writeValueAsString(list);
+        } catch (Exception e) {
+            return "[]";
+        }
     }
 
     private String text(JsonNode n, String field) {

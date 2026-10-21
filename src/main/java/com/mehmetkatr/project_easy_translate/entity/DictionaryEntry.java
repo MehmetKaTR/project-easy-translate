@@ -45,6 +45,15 @@ public class DictionaryEntry extends BaseEntity {
     @Column(length = 2)
     private String cefr;
 
+    /** Konu kategorisi (universal, renkli kart gruplari icin). */
+    @Column(length = 40)
+    private String topic;
+
+    /** Kelime kaynagi: CEFR | ANKI | ... (kategori/filtre icin). */
+    @Builder.Default
+    @Column(length = 20)
+    private String source = "CEFR";
+
     @Builder.Default
     @Column(nullable = false)
     private boolean idiom = false;
